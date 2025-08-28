@@ -766,21 +766,41 @@ const App: React.FC = () => {
     const processedCount = batchImages.filter(img => img.status === 'done' || img.status === 'error').length;
     const totalCount = batchImages.length;
     const canDownload = batchImages.some(img => img.status === 'done');
+    const progressPercentage = totalCount > 0 ? (processedCount / totalCount) * 100 : 0;
+    const isBatchFinished = !isLoading && processedCount > 0;
+    const allProcessed = processedCount === totalCount;
+
+    let progressText = '';
+    if (isLoading) {
+        progressText = `Processing... (${processedCount} / ${totalCount} complete)`;
+    } else if (isBatchFinished) {
+        if (allProcessed) {
+            progressText = `Batch complete. (${processedCount} / ${totalCount} processed)`;
+        } else {
+            progressText = `Operation stopped. (${processedCount} / ${totalCount} processed)`;
+        }
+    } else {
+        progressText = `Ready to process ${totalCount} images.`;
+    }
   
     return (
       <div className="w-full max-w-7xl mx-auto flex flex-col items-center gap-6 animate-fade-in">
           <div className="text-center w-full max-w-4xl">
               <h2 className="text-3xl font-bold">Batch Editing Mode</h2>
               
-              {isLoading ? (
-                  <div className="mt-4 animate-fade-in">
-                      <p className="text-gray-600 mb-2 font-semibold">
-                          Processing... ({processedCount} / {totalCount} complete)
-                      </p>
+              <div className="mt-4">
+                  <p className="text-gray-600 mb-2 font-semibold">
+                      {progressText}
+                  </p>
+                  {(isLoading || isBatchFinished) && (
                       <div className="w-full bg-gray-300 rounded-full h-4 overflow-hidden shadow-inner">
                           <div 
-                              className="bg-gradient-to-r from-blue-500 to-cyan-400 h-4 rounded-full transition-all duration-500 ease-out"
-                              style={{ width: `${(processedCount / totalCount) * 100}%` }}
+                              className={`h-4 rounded-full transition-all duration-500 ease-out ${
+                                  isLoading 
+                                      ? 'bg-gradient-to-r from-blue-500 to-cyan-400' 
+                                      : 'bg-gradient-to-r from-green-500 to-teal-400'
+                              }`}
+                              style={{ width: `${progressPercentage}%` }}
                               role="progressbar"
                               aria-valuenow={processedCount}
                               aria-valuemin={0}
@@ -788,13 +808,8 @@ const App: React.FC = () => {
                               aria-label="Batch processing progress"
                           ></div>
                       </div>
-                  </div>
-              ) : (
-                  <p className="text-gray-500 mt-1">
-                      Ready to process {totalCount} images.
-                      {processedCount > 0 && ` (${processedCount} / ${totalCount} complete)`}
-                  </p>
-              )}
+                  )}
+              </div>
           </div>
           
           <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4 bg-gray-200/50 rounded-lg">
