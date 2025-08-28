@@ -18,7 +18,7 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onShowShortcuts, onSho
   };
 
   return (
-    <header className="w-full py-3 px-4 sm:px-8 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800 sticky top-0 z-50">
+    <header className="w-full py-3 px-4 sm:px-8 border-b border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="flex items-center justify-between">
           <div className="flex items-center justify-center gap-3">
               <SparkleIcon className="w-6 h-6 text-blue-500 dark:text-blue-400" />
@@ -32,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onShowShortcuts, onSho
                   onClick={onShowFaq}
                   title="View FAQ"
                   aria-label="View FAQ"
-                  className="px-3 py-2 rounded-full text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  className="px-3 py-2 rounded-full text-sm font-semibold text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-white transition-colors"
               >
                   FAQ
               </button>
@@ -40,7 +40,7 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onShowShortcuts, onSho
                   onClick={onShowShortcuts}
                   title="View keyboard shortcuts"
                   aria-label="View keyboard shortcuts"
-                  className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  className="p-2 rounded-full text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-white transition-colors"
               >
                   <QuestionMarkCircleIcon className="w-6 h-6" />
               </button>
@@ -48,7 +48,7 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onShowShortcuts, onSho
                   onClick={toggleTheme}
                   title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
                   aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-                  className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  className="p-2 rounded-full text-gray-500 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-white transition-colors"
               >
                   {theme === 'light' ? (
                       <MoonIcon className="w-6 h-6" />

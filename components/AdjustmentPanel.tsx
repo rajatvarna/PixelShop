@@ -35,8 +35,8 @@ const AdjustmentPanel: React.FC<AdjustmentPanelProps> = ({ onApplyAdjustment, is
   };
 
   return (
-    <div className="w-full bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg p-4 flex flex-col gap-4 animate-fade-in">
-      <h3 className="text-lg font-semibold text-center text-gray-700 dark:text-gray-300">Apply a Professional Adjustment</h3>
+    <div className="w-full bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-800 rounded-lg p-4 flex flex-col gap-4 animate-fade-in">
+      <h3 className="text-lg font-semibold text-center text-gray-700 dark:text-gray-100">Apply a Professional Adjustment</h3>
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {presets.map(preset => (
@@ -44,7 +44,7 @@ const AdjustmentPanel: React.FC<AdjustmentPanelProps> = ({ onApplyAdjustment, is
             key={preset.name}
             onClick={() => handlePresetClick(preset.prompt)}
             disabled={isLoading}
-            className={`w-full text-center bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold py-3 px-4 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-gray-600 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed ${activePrompt === preset.prompt ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-gray-800 ring-blue-500' : 'border-transparent'}`}
+            className={`w-full text-center bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold py-3 px-4 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed ${activePrompt === preset.prompt ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 ring-blue-500' : 'border-transparent'}`}
           >
             {preset.name}
           </button>
@@ -56,7 +56,7 @@ const AdjustmentPanel: React.FC<AdjustmentPanelProps> = ({ onApplyAdjustment, is
         value={activePrompt}
         onChange={handleCustomChange}
         placeholder="Or describe an adjustment (e.g., 'change background to a forest')"
-        className="flex-grow bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60 text-base"
+        className="flex-grow bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60 text-base"
         disabled={isLoading}
       />
 

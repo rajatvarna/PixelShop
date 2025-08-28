@@ -10,23 +10,10 @@ interface FaqPageProps {
   onBackToEditor: () => void;
 }
 
-const Shortcut: React.FC<{ keys: string[]; description: string }> = ({ keys, description }) => (
-  <div className="flex items-center justify-between py-3 border-b border-gray-200 dark:border-gray-700">
-    <p className="text-gray-700 dark:text-gray-300">{description}</p>
-    <div className="flex items-center gap-1">
-      {keys.map(key => (
-        <kbd key={key} className="px-2 py-1 text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md">
-          {key}
-        </kbd>
-      ))}
-    </div>
-  </div>
-);
-
 const FaqItem: React.FC<{ question: string; children: React.ReactNode }> = ({ question, children }) => (
     <div className="mb-6">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">{question}</h3>
-        <div className="text-gray-600 dark:text-gray-400 space-y-2">
+        <div className="text-gray-600 dark:text-gray-300 space-y-2">
             {children}
         </div>
     </div>
@@ -47,34 +34,7 @@ const FaqPage: React.FC<FaqPageProps> = ({ onBackToEditor }) => {
             Frequently Asked Questions
         </h1>
 
-        <div className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 md:p-8 mt-4">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 border-b border-gray-200 dark:border-gray-700 pb-4">
-                Keyboard Shortcuts
-            </h2>
-            <div className="mb-6">
-                <h3 className="font-semibold text-gray-600 dark:text-gray-400 mb-2">Editing</h3>
-                <Shortcut keys={['Cmd/Ctrl', 'Z']} description="Undo" />
-                <Shortcut keys={['Cmd/Ctrl', 'Shift', 'Z']} description="Redo (macOS)" />
-                <Shortcut keys={['Ctrl', 'Y']} description="Redo (Windows/Linux)" />
-                <Shortcut keys={['Cmd/Ctrl', 'Enter']} description="Apply current action" />
-                <Shortcut keys={['Hold C']} description="Compare with original" />
-            </div>
-
-            <div className="mb-6">
-                <h3 className="font-semibold text-gray-600 dark:text-gray-400 mb-2">Navigation</h3>
-                <Shortcut keys={['Alt', '1']} description="Switch to Retouch tab" />
-                <Shortcut keys={['Alt', '2']} description="Switch to Crop tab" />
-                <Shortcut keys={['Alt', '3']} description="Switch to Adjust tab" />
-                <Shortcut keys={['Alt', '4']} description="Switch to Filters tab" />
-            </div>
-
-            <div className="mb-8">
-                <h3 className="font-semibold text-gray-600 dark:text-gray-400 mb-2">File</h3>
-                <Shortcut keys={['Alt', 'R']} description="Reset all changes" />
-                <Shortcut keys={['Alt', 'U']} description="Upload new image" />
-                <Shortcut keys={['Cmd/Ctrl', 'S']} description="Download image" />
-            </div>
-
+        <div className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 md:p-8 mt-4">
             <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 border-b border-gray-200 dark:border-gray-700 pb-4">
                 General Questions
             </h2>

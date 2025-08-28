@@ -430,7 +430,7 @@ const App: React.FC = () => {
        return (
            <div className="text-center animate-fade-in bg-red-500/10 border border-red-500/20 p-8 rounded-lg max-w-2xl mx-auto flex flex-col items-center gap-4">
             <h2 className="text-2xl font-bold text-red-500 dark:text-red-300">An Error Occurred</h2>
-            <p className="text-md text-red-600 dark:text-red-400">{error}</p>
+            <p className="text-md text-red-600 dark:text-red-300">{error}</p>
             <button
                 onClick={() => setError(null)}
                 className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg text-md transition-colors"
@@ -482,7 +482,7 @@ const App: React.FC = () => {
 
     return (
       <div className="w-full max-w-4xl mx-auto flex flex-col items-center gap-6 animate-fade-in">
-        <div className="relative w-full shadow-2xl rounded-xl overflow-hidden bg-gray-200 dark:bg-gray-900">
+        <div className="relative w-full shadow-2xl rounded-xl overflow-hidden bg-gray-200 dark:bg-black">
             {isLoading && (
                 <div className="absolute inset-0 bg-black/70 z-30 flex flex-col items-center justify-center gap-4 animate-fade-in">
                     <Spinner />
@@ -512,7 +512,7 @@ const App: React.FC = () => {
             )}
         </div>
         
-        <div className="w-full bg-gray-200/80 dark:bg-gray-800 border border-gray-300/80 dark:border-gray-700 rounded-lg p-2 flex items-center justify-center gap-2">
+        <div className="w-full bg-gray-200/80 dark:bg-gray-900 border border-gray-300/80 dark:border-gray-800 rounded-lg p-2 flex items-center justify-center gap-2">
             {(['retouch', 'crop', 'adjust', 'filters'] as const).map((tab, index) => (
                  <button
                     key={tab}
@@ -521,7 +521,7 @@ const App: React.FC = () => {
                     className={`w-full capitalize font-semibold py-3 px-5 rounded-md transition-all duration-200 text-base ${
                         activeTab === tab 
                         ? 'bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-lg shadow-cyan-500/40' 
-                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-700'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-300/50 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-white'
                     }`}
                 >
                     {tab}
@@ -532,7 +532,7 @@ const App: React.FC = () => {
         <div className="w-full">
             {activeTab === 'retouch' && (
                 <div className="flex flex-col items-center gap-4">
-                    <p className="text-md text-gray-600 dark:text-gray-400">
+                    <p className="text-md text-gray-600 dark:text-gray-300">
                         {editHotspot ? 'Great! Now describe your localized edit below.' : 'Click an area on the image to make a precise edit.'}
                     </p>
                     <form onSubmit={(e) => { e.preventDefault(); handleGenerate(); }} className="w-full flex items-center gap-2">
@@ -541,7 +541,7 @@ const App: React.FC = () => {
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
                             placeholder={editHotspot ? "e.g., 'change my shirt color to blue'" : "First click a point on the image"}
-                            className="flex-grow bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-lg p-5 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60"
+                            className="flex-grow bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-200 rounded-lg p-5 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60"
                             disabled={isLoading || !editHotspot}
                         />
                         <button 
@@ -565,7 +565,7 @@ const App: React.FC = () => {
                 onClick={handleUndo}
                 disabled={!canUndo}
                 title="Undo (Cmd/Ctrl + Z)"
-                className="flex items-center justify-center text-center bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300 dark:hover:bg-gray-600 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-200 dark:disabled:bg-gray-700"
+                className="flex items-center justify-center text-center bg-transparent border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 dark:hover:bg-gray-800 dark:hover:text-white active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent"
                 aria-label="Undo last action"
             >
                 <UndoIcon className="w-5 h-5 mr-2" />
@@ -575,7 +575,7 @@ const App: React.FC = () => {
                 onClick={handleRedo}
                 disabled={!canRedo}
                 title="Redo (Cmd/Ctrl + Shift + Z or Ctrl + Y)"
-                className="flex items-center justify-center text-center bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300 dark:hover:bg-gray-600 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-200 dark:disabled:bg-gray-700"
+                className="flex items-center justify-center text-center bg-transparent border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 dark:hover:bg-gray-800 dark:hover:text-white active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent"
                 aria-label="Redo last action"
             >
                 <RedoIcon className="w-5 h-5 mr-2" />
@@ -592,7 +592,7 @@ const App: React.FC = () => {
                   onTouchStart={() => setIsComparing(true)}
                   onTouchEnd={() => setIsComparing(false)}
                   title="Compare with original (Hold C)"
-                  className="flex items-center justify-center text-center bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300 dark:hover:bg-gray-600 active:scale-95 text-base"
+                  className="flex items-center justify-center text-center bg-transparent border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 dark:hover:bg-gray-800 dark:hover:text-white active:scale-95 text-base"
                   aria-label="Press and hold to see original image"
               >
                   <EyeIcon className="w-5 h-5 mr-2" />
@@ -604,14 +604,14 @@ const App: React.FC = () => {
                 onClick={handleReset}
                 disabled={!canUndo}
                 title="Reset to original image (Alt + R)"
-                className="text-center bg-transparent border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 dark:hover:bg-gray-700/50 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent"
+                className="text-center bg-transparent border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 dark:hover:bg-gray-800 dark:hover:text-white active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent"
               >
                 Reset
             </button>
             <button 
                 onClick={handleUploadNew}
                 title="Upload a new image (Alt + U)"
-                className="text-center bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300 dark:hover:bg-gray-600 active:scale-95 text-base"
+                className="text-center bg-transparent border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 dark:hover:bg-gray-800 dark:hover:text-white active:scale-95 text-base"
             >
                 Upload New
             </button>
