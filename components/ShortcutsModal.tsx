@@ -15,7 +15,7 @@ const Shortcut: React.FC<{ keys: string[]; description: string }> = ({ keys, des
     <p className="text-gray-700 dark:text-gray-300">{description}</p>
     <div className="flex items-center gap-1">
       {keys.map(key => (
-        <kbd key={key} className="px-2 py-1 text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md">
+        <kbd key={key} className="px-2 py-1 text-sm font-semibold text-gray-700 dark:text-gray-100 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md">
           {key}
         </kbd>
       ))}
@@ -55,7 +55,7 @@ const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
         
         <div className="p-6">
             <div className="mb-6">
-                <h3 className="font-semibold text-gray-600 dark:text-gray-300 mb-2">Editing</h3>
+                <h3 className="font-semibold text-gray-600 dark:text-gray-100 mb-2">Editing</h3>
                 <Shortcut keys={['Cmd/Ctrl', 'Z']} description="Undo" />
                 <Shortcut keys={['Cmd/Ctrl', 'Shift', 'Z']} description="Redo (macOS)" />
                 <Shortcut keys={['Ctrl', 'Y']} description="Redo (Windows/Linux)" />
@@ -64,7 +64,7 @@ const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
             </div>
 
             <div className="mb-6">
-                <h3 className="font-semibold text-gray-600 dark:text-gray-300 mb-2">Navigation</h3>
+                <h3 className="font-semibold text-gray-600 dark:text-gray-100 mb-2">Navigation</h3>
                 <Shortcut keys={['Alt', '1']} description="Switch to Retouch tab" />
                 <Shortcut keys={['Alt', '2']} description="Switch to Crop tab" />
                 <Shortcut keys={['Alt', '3']} description="Switch to Adjust tab" />
@@ -72,7 +72,7 @@ const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
             </div>
 
             <div>
-                <h3 className="font-semibold text-gray-600 dark:text-gray-300 mb-2">File</h3>
+                <h3 className="font-semibold text-gray-600 dark:text-gray-100 mb-2">File</h3>
                 <Shortcut keys={['Alt', 'R']} description="Reset all changes" />
                 <Shortcut keys={['Alt', 'U']} description="Upload new image" />
                 <Shortcut keys={['Cmd/Ctrl', 'S']} description="Download image" />
