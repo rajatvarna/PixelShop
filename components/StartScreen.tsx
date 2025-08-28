@@ -29,10 +29,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onFileSelect }) => {
       }}
     >
       <div className="flex flex-col items-center gap-6 animate-fade-in relative">
-        <div className="absolute -top-24 -z-10 w-72 h-72 bg-blue-500/50 dark:bg-blue-500/30 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute top-0 right-0 -z-10 w-96 h-96 bg-cyan-400/30 dark:bg-cyan-400/20 rounded-full blur-3xl animate-pulse animation-delay-3000"></div>
-
-        <h1 className="text-5xl font-extrabold tracking-tight text-gray-800 dark:text-gray-100 sm:text-6xl md:text-7xl">
+        <h1 className="text-5xl font-extrabold tracking-tight text-gray-800 dark:text-gray-100 sm:text-6xl md:text-7xl text-glow">
           AI-Powered Photo Editing, <span className="text-blue-500 dark:text-blue-400">Simplified</span>.
         </h1>
         <p className="max-w-2xl text-lg text-gray-600 dark:text-gray-400 md:text-xl">
@@ -80,7 +77,7 @@ interface FeatureCardProps {
 }
 
 const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) => (
-    <div className="bg-white/40 dark:bg-black/20 p-6 rounded-lg border border-gray-300/50 dark:border-gray-700/50 flex flex-col items-center text-center backdrop-blur-md transition-all duration-300 hover:border-gray-400/80 dark:hover:border-gray-500/80 hover:scale-[1.02]">
+    <div className="bg-white/60 dark:bg-gray-800 p-6 rounded-lg border border-gray-300/50 dark:border-gray-700/50 flex flex-col items-center text-center transition-all duration-300 hover:border-gray-400/80 dark:hover:border-gray-600/80 hover:scale-[1.02] hover:bg-white dark:hover:bg-gray-700/80">
         <div className="flex items-center justify-center w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full mb-4">
            {icon}
         </div>

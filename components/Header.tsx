@@ -17,7 +17,7 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onShowShortcuts }) => 
   };
 
   return (
-    <header className="w-full py-3 px-4 sm:px-8 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/30 backdrop-blur-sm sticky top-0 z-50">
+    <header className="w-full py-3 px-4 sm:px-8 border-b border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800 sticky top-0 z-50">
       <div className="flex items-center justify-between">
           <div className="flex items-center justify-center gap-3">
               <SparkleIcon className="w-6 h-6 text-blue-500 dark:text-blue-400" />
@@ -31,7 +31,7 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onShowShortcuts }) => 
                   onClick={onShowShortcuts}
                   title="View keyboard shortcuts"
                   aria-label="View keyboard shortcuts"
-                  className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-black/10 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
               >
                   <QuestionMarkCircleIcon className="w-6 h-6" />
               </button>
@@ -39,7 +39,7 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onShowShortcuts }) => 
                   onClick={toggleTheme}
                   title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
                   aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-                  className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-black/10 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                  className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
               >
                   {theme === 'light' ? (
                       <MoonIcon className="w-6 h-6" />
