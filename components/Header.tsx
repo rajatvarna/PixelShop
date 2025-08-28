@@ -9,9 +9,10 @@ interface HeaderProps {
     theme: 'light' | 'dark';
     setTheme: (theme: 'light' | 'dark') => void;
     onShowShortcuts: () => void;
+    onShowFaq: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ theme, setTheme, onShowShortcuts }) => {
+const Header: React.FC<HeaderProps> = ({ theme, setTheme, onShowShortcuts, onShowFaq }) => {
   const toggleTheme = () => {
     setTheme(theme === 'light' ? 'dark' : 'light');
   };
@@ -22,11 +23,19 @@ const Header: React.FC<HeaderProps> = ({ theme, setTheme, onShowShortcuts }) => 
           <div className="flex items-center justify-center gap-3">
               <SparkleIcon className="w-6 h-6 text-blue-500 dark:text-blue-400" />
               <h1 className="text-xl font-bold tracking-tight text-gray-800 dark:text-gray-100">
-                Pixshop
+                Pixelshop
               </h1>
           </div>
 
           <div className="flex items-center gap-2">
+              <button
+                  onClick={onShowFaq}
+                  title="View FAQ"
+                  aria-label="View FAQ"
+                  className="px-3 py-2 rounded-full text-sm font-semibold text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              >
+                  FAQ
+              </button>
               <button
                   onClick={onShowShortcuts}
                   title="View keyboard shortcuts"

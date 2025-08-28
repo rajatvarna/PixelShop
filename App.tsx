@@ -15,6 +15,7 @@ import CropPanel from './components/CropPanel';
 import { UndoIcon, RedoIcon, EyeIcon } from './components/icons';
 import StartScreen from './components/StartScreen';
 import ShortcutsModal from './components/ShortcutsModal';
+import FaqPage from './components/FaqPage';
 
 // Helper to convert a data URL string to a File object
 const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -35,6 +36,7 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 
 type Tab = 'retouch' | 'adjust' | 'filters' | 'crop';
 type Theme = 'light' | 'dark';
+type Page = 'editor' | 'faq';
 
 const App: React.FC = () => {
   const [history, setHistory] = useState<File[]>([]);
@@ -58,6 +60,7 @@ const App: React.FC = () => {
   
   const [theme, setTheme] = useState<Theme>('dark');
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState<Page>('editor');
 
   // Effect for theme management
   useEffect(() => {
@@ -422,7 +425,7 @@ const App: React.FC = () => {
   ]);
 
 
-  const renderContent = () => {
+  const renderEditorContent = () => {
     if (error) {
        return (
            <div className="text-center animate-fade-in bg-red-500/10 border border-red-500/20 p-8 rounded-lg max-w-2xl mx-auto flex flex-col items-center gap-4">
@@ -631,9 +634,16 @@ const App: React.FC = () => {
         theme={theme}
         setTheme={setTheme}
         onShowShortcuts={() => setIsShortcutsModalOpen(true)}
+        onShowFaq={() => setCurrentPage('faq')}
       />
-      <main className={`flex-grow w-full max-w-[1600px] mx-auto p-4 md:p-8 flex justify-center ${currentImage ? 'items-start' : 'items-center'}`}>
-        {renderContent()}
+      <main className={`flex-grow w-full max-w-[1600px] mx-auto p-4 md:p-8 flex justify-center ${
+        (currentPage === 'editor' && currentImage) ? 'items-start' : 'items-center'
+      }`}>
+        {currentPage === 'faq' ? (
+          <FaqPage onBackToEditor={() => setCurrentPage('editor')} />
+        ) : (
+          renderEditorContent()
+        )}
       </main>
       <ShortcutsModal 
         isOpen={isShortcutsModalOpen}
