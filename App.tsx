@@ -12,7 +12,7 @@ import Spinner from './components/Spinner';
 import FilterPanel from './components/FilterPanel';
 import AdjustmentPanel from './components/AdjustmentPanel';
 import CropPanel from './components/CropPanel';
-import { UndoIcon, RedoIcon, EyeIcon } from './components/icons';
+import { UndoIcon, RedoIcon, EyeIcon, DownloadIcon } from './components/icons';
 import StartScreen from './components/StartScreen';
 import ShortcutsModal from './components/ShortcutsModal';
 import FaqPage from './components/FaqPage';
@@ -423,6 +423,18 @@ const App: React.FC = () => {
     }
   };
 
+  const handleDownloadIndividual = useCallback((editedUrl: string, originalName: string) => {
+    const link = document.createElement('a');
+    link.href = editedUrl;
+    const nameParts = originalName.split('.');
+    const extension = nameParts.length > 1 ? nameParts.pop() : 'png';
+    const baseName = nameParts.join('.');
+    link.download = `${baseName}-edited.${extension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, []);
+
   const handleCancelBatch = () => {
     if (window.confirm('Are you sure you want to cancel the batch operation? Any images currently being processed will finish, but no new images will be started.')) {
         isCancellingRef.current = true;
@@ -814,7 +826,7 @@ const App: React.FC = () => {
           
           <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4 bg-gray-200/50 rounded-lg">
               {batchImages.map(image => (
-                  <BatchImageCard key={image.id} image={image} />
+                  <BatchImageCard key={image.id} image={image} onDownload={handleDownloadIndividual} />
               ))}
           </div>
   
@@ -921,7 +933,12 @@ const App: React.FC = () => {
   );
 };
 
-const BatchImageCard: React.FC<{ image: BatchImage }> = ({ image }) => {
+interface BatchImageCardProps {
+    image: BatchImage;
+    onDownload: (editedUrl: string, originalName: string) => void;
+}
+
+const BatchImageCard: React.FC<BatchImageCardProps> = ({ image, onDownload }) => {
     const [originalUrl, setOriginalUrl] = useState('');
     const [isHovering, setIsHovering] = useState(false);
 
@@ -932,6 +949,7 @@ const BatchImageCard: React.FC<{ image: BatchImage }> = ({ image }) => {
     }, [image.original]);
 
     const canToggle = image.status === 'done' && image.editedUrl;
+    const canDownload = image.status === 'done' && image.editedUrl;
     const indicatorText = isHovering ? 'Original' : 'Edited';
 
     return (
@@ -952,6 +970,17 @@ const BatchImageCard: React.FC<{ image: BatchImage }> = ({ image }) => {
                 />
             )}
             
+            {canDownload && (
+                <button
+                    onClick={() => onDownload(image.editedUrl!, image.original.name)}
+                    title={`Download ${image.original.name}`}
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-3 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out z-20 hover:bg-black/80 active:scale-95"
+                    aria-label="Download edited image"
+                >
+                    <DownloadIcon className="w-6 h-6" />
+                </button>
+            )}
+
             <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/60 to-transparent p-2">
                 <p className="text-white text-xs font-medium truncate">{image.original.name}</p>
             </div>

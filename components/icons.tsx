@@ -85,3 +85,9 @@ export const LightbulbIcon: React.FC<{ className?: string }> = ({ className }) =
       <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 14.25h3m-6.75 3h10.5M10.002 6.374A5.996 5.996 0 0112 6c1.998 0 3.823.792 5.167 2.083A6.002 6.002 0 0118 12c0 .997-.24 1.935-.67 2.75M10.002 6.374c-.62.91-1 2-1 3.126 0 .997.24 1.935.67 2.75M12 18.75h.008v.008H12v-.008z" />
     </svg>
 );
+
+export const DownloadIcon: React.FC<{ className?: string }> = ({ className }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
+);

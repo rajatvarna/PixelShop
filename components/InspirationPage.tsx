@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React, { useState } from 'react';
+import React from 'react';
 import { inspirationData, Inspiration } from '../data/inspiration';
 import { ChevronLeftIcon } from './icons';
 
@@ -41,28 +41,32 @@ const InspirationPage: React.FC<InspirationPageProps> = ({ onBackToEditor, onTry
 };
 
 const InspirationCard: React.FC<{ item: Inspiration; onTryPrompt: InspirationPageProps['onTryPrompt'] }> = ({ item, onTryPrompt }) => {
-    const [isHovering, setIsHovering] = useState(false);
-
     return (
         <div className="bg-white rounded-xl shadow-lg overflow-hidden flex flex-col group">
             <div 
-                className="relative aspect-square w-full bg-gray-200"
-                onMouseEnter={() => setIsHovering(true)}
-                onMouseLeave={() => setIsHovering(false)}
+                className="relative aspect-square w-full bg-gray-200 overflow-hidden"
             >
-                <img src={item.before} alt="Before" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                <img 
+                    src={item.before} 
+                    alt="Before" 
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" 
+                    loading="lazy" 
+                />
                 <img 
                     src={item.after} 
                     alt="After" 
-                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out ${isHovering ? 'opacity-0' : 'opacity-100'}`}
+                    className="absolute inset-0 w-full h-full object-cover transition-all duration-300 ease-in-out group-hover:scale-105 opacity-100 group-hover:opacity-0"
                     loading="lazy"
                 />
                 <div 
-                    className={`absolute top-2 right-2 px-3 py-1 text-sm font-bold rounded-full transition-opacity duration-300 ${
-                        isHovering ? 'bg-black/50 text-white' : 'bg-white/50 text-black'
-                    }`}
+                    className="absolute top-2 right-2 px-3 py-1 text-sm font-bold rounded-full transition-opacity duration-300 opacity-100 group-hover:opacity-0 bg-white/50 text-black"
                 >
-                    {isHovering ? 'Before' : 'After'}
+                    After
+                </div>
+                <div 
+                    className="absolute top-2 right-2 px-3 py-1 text-sm font-bold rounded-full transition-opacity duration-300 opacity-0 group-hover:opacity-100 bg-black/50 text-white"
+                >
+                    Before
                 </div>
             </div>
             <div className="p-4 flex flex-col flex-grow">
