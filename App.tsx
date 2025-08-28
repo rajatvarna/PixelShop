@@ -16,6 +16,7 @@ import { UndoIcon, RedoIcon, EyeIcon } from './components/icons';
 import StartScreen from './components/StartScreen';
 import ShortcutsModal from './components/ShortcutsModal';
 import FaqPage from './components/FaqPage';
+import InspirationPage from './components/InspirationPage';
 import JSZip from 'jszip';
 
 // Helper to convert a data URL string to a File object
@@ -36,7 +37,7 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
 }
 
 type Tab = 'retouch' | 'adjust' | 'filters' | 'crop';
-type Page = 'editor' | 'faq';
+type Page = 'editor' | 'faq' | 'inspiration';
 
 type BatchImageStatus = 'pending' | 'processing' | 'done' | 'error';
 interface BatchImage {
@@ -82,12 +83,38 @@ const App: React.FC = () => {
   // UI state
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('editor');
+  const [promptToTry, setPromptToTry] = useState<{ prompt: string; type: Tab } | null>(null);
 
   const currentImage = history[historyIndex] ?? null;
   const originalImage = history[0] ?? null;
 
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
+
+  // Effect to handle trying a prompt from the inspiration gallery
+  useEffect(() => {
+    // This effect runs when the user returns to the editor after choosing a prompt
+    if (promptToTry && currentPage === 'editor') {
+        const isImageReady = currentImage || batchImages.length > 0;
+        
+        // If an image is ready, apply the prompt. Otherwise, it will wait.
+        // The effect will re-run when an image is uploaded because `currentImage` will change.
+        if (isImageReady) {
+            const { prompt, type } = promptToTry;
+
+            setActiveTab(type);
+
+            if (type === 'filters') {
+                setFilterPrompt(prompt);
+            } else if (type === 'adjust') {
+                setAdjustmentPrompt(prompt);
+            }
+            
+            // Consume the prompt so it doesn't re-apply on every render
+            setPromptToTry(null);
+        }
+    }
+  }, [promptToTry, currentPage, currentImage, batchImages.length]);
 
   // Effect to create and revoke object URLs safely for the current image
   useEffect(() => {
@@ -444,6 +471,11 @@ const App: React.FC = () => {
 
   const handleTabChange = useCallback((tab: Tab) => {
     setActiveTab(tab);
+  }, []);
+
+  const handleTryPrompt = useCallback((prompt: string, type: 'filters' | 'adjust') => {
+    setPromptToTry({ prompt, type });
+    setCurrentPage('editor');
   }, []);
 
   // Keyboard shortcuts effect
@@ -853,11 +885,14 @@ const App: React.FC = () => {
       <Header 
         onShowShortcuts={() => setIsShortcutsModalOpen(true)}
         onShowFaq={() => setCurrentPage('faq')}
+        onShowInspiration={() => setCurrentPage('inspiration')}
       />
       <main className={`flex-grow w-full max-w-[1600px] mx-auto p-4 md:p-8 flex justify-center ${
         (currentPage === 'editor' && (currentImage || batchImages.length > 0)) ? 'items-start' : 'items-center'
       }`}>
-        {currentPage === 'faq' ? (
+        {currentPage === 'inspiration' ? (
+          <InspirationPage onTryPrompt={handleTryPrompt} onBackToEditor={() => setCurrentPage('editor')} />
+        ) : currentPage === 'faq' ? (
           <FaqPage onBackToEditor={() => setCurrentPage('editor')} />
         ) : (
           renderEditorContent()
