@@ -66,7 +66,7 @@ const HeroShowcase: React.FC = () => {
             onMouseLeave={() => setIsPaused(false)}
         >
             <div 
-              className="relative w-full aspect-[4/3] rounded-2xl shadow-2xl overflow-hidden group bg-gray-200 dark:bg-black"
+              className="relative w-full aspect-[4/3] rounded-2xl shadow-2xl overflow-hidden group bg-gray-200"
               onMouseEnter={() => setIsHovering(true)}
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
@@ -97,8 +97,8 @@ const HeroShowcase: React.FC = () => {
                 </div>
             </div>
 
-            <p className="text-gray-700 dark:text-gray-200 font-medium text-center h-12 flex items-center">
-                <span className="font-mono text-blue-500 dark:text-blue-400 mr-2 text-lg">&gt;</span>
+            <p className="text-gray-700 font-medium text-center h-12 flex items-center">
+                <span className="font-mono text-blue-500 mr-2 text-lg">&gt;</span>
                 {currentExample.prompt}
             </p>
 
@@ -108,7 +108,7 @@ const HeroShowcase: React.FC = () => {
                         key={index}
                         onClick={() => setCurrentIndex(index)}
                         className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                            currentIndex === index ? 'bg-blue-500 scale-125' : 'bg-gray-300 dark:bg-gray-700 hover:bg-gray-400'
+                            currentIndex === index ? 'bg-blue-500 scale-125' : 'bg-gray-300 hover:bg-gray-400'
                         }`}
                         aria-label={`Go to example ${index + 1}`}
                     />

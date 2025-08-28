@@ -29,12 +29,12 @@ const CropPanel: React.FC<CropPanelProps> = ({ onApplyCrop, onSetAspect, isLoadi
   ];
 
   return (
-    <div className="w-full bg-gray-100 dark:bg-gray-950 border border-gray-300 dark:border-gray-800 rounded-lg p-4 flex flex-col items-center gap-4 animate-fade-in">
-      <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-100">Crop Image</h3>
-      <p className="text-sm text-gray-500 dark:text-gray-400 -mt-2">Click and drag on the image to select a crop area.</p>
+    <div className="w-full bg-gray-100 border border-gray-300 rounded-lg p-4 flex flex-col items-center gap-4 animate-fade-in">
+      <h3 className="text-lg font-semibold text-gray-700">Crop Image</h3>
+      <p className="text-sm text-gray-500 -mt-2">Click and drag on the image to select a crop area.</p>
       
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Aspect Ratio:</span>
+        <span className="text-sm font-medium text-gray-600">Aspect Ratio:</span>
         {aspects.map(({ name, value }) => (
           <button
             key={name}
@@ -43,7 +43,7 @@ const CropPanel: React.FC<CropPanelProps> = ({ onApplyCrop, onSetAspect, isLoadi
             className={`px-4 py-2 rounded-md text-base font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 ${
               activeAspect === name 
               ? 'bg-gradient-to-br from-blue-600 to-blue-500 text-white shadow-md shadow-blue-500/20' 
-              : 'bg-gray-200 dark:bg-gray-900 border border-transparent dark:border-gray-700 hover:bg-gray-300 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-200'
+              : 'bg-gray-200 border border-transparent hover:bg-gray-300 text-gray-700'
             }`}
           >
             {name}
