@@ -55,6 +55,7 @@ const App: React.FC = () => {
   
   // Batch editor state
   const [batchImages, setBatchImages] = useState<BatchImage[]>([]);
+  const isCancellingRef = useRef<boolean>(false);
 
   // Common state
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -170,38 +171,54 @@ const App: React.FC = () => {
     }
   }, [currentImage, prompt, editHotspot, addImageToHistory]);
   
-  const handleBatchApply = async (prompt: string, type: 'filter' | 'adjust') => {
+  const handleBatchApply = useCallback(async (prompt: string, type: 'filter' | 'adjust') => {
     if (!prompt.trim()) {
         setError(`Please enter a prompt for the batch ${type}.`);
         return;
     }
+    
+    const imagesToProcess = batchImages.filter(img => img.status === 'pending' || img.status === 'error');
+    if (imagesToProcess.length === 0) {
+        return;
+    }
+    
     setIsLoading(true);
     setError(null);
-
-    setBatchImages(prev => prev.map(img => ({ ...img, status: 'processing' })));
+    isCancellingRef.current = false; // Reset on new run
 
     const editFunction = type === 'filter' ? generateFilteredImage : generateAdjustedImage;
 
-    const promises = batchImages.map(async (image) => {
+    for (const imageToProcess of imagesToProcess) {
+        if (isCancellingRef.current) {
+            console.log('Batch operation cancelled by user.');
+            break;
+        }
+
+        setBatchImages(prev => prev.map(img => 
+            img.id === imageToProcess.id ? { ...img, status: 'processing' } : img
+        ));
+
         try {
-            const editedUrl = await editFunction(image.original, prompt);
-            return { ...image, editedUrl, status: 'done' as BatchImageStatus };
+            const editedUrl = await editFunction(imageToProcess.original, prompt);
+            setBatchImages(prev => prev.map(img =>
+                img.id === imageToProcess.id
+                    ? { ...img, editedUrl, status: 'done', error: undefined }
+                    : img
+            ));
         } catch (err) {
             const message = err instanceof Error ? err.message : 'An unknown error occurred.';
-            console.error(`Batch processing failed for ${image.original.name}:`, err);
-            return { ...image, status: 'error' as BatchImageStatus, error: message };
+            console.error(`Batch processing failed for ${imageToProcess.original.name}:`, err);
+            setBatchImages(prev => prev.map(img =>
+                img.id === imageToProcess.id
+                    ? { ...img, status: 'error', error: message }
+                    : img
+            ));
         }
-    });
-
-    for (const promise of promises) {
-        promise.then(updatedImage => {
-            setBatchImages(prev => prev.map(img => img.id === updatedImage.id ? updatedImage : img));
-        });
     }
 
-    await Promise.all(promises);
     setIsLoading(false);
-  };
+    isCancellingRef.current = false;
+  }, [batchImages]);
   
   const handleApplyFilter = useCallback(async (filterPrompt: string) => {
     if (batchImages.length > 0) {
@@ -224,7 +241,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, addImageToHistory, batchImages]);
+  }, [currentImage, addImageToHistory, batchImages, handleBatchApply]);
   
   const handleApplyAdjustment = useCallback(async (adjustmentPrompt: string) => {
     if (batchImages.length > 0) {
@@ -249,7 +266,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, addImageToHistory, batchImages]);
+  }, [currentImage, addImageToHistory, batchImages, handleBatchApply]);
 
   const handleApplyCrop = useCallback(() => {
     if (!completedCrop || !imgRef.current) {
@@ -376,6 +393,12 @@ const App: React.FC = () => {
         setError("Could not create the zip file for download.");
     } finally {
         setIsLoading(false);
+    }
+  };
+
+  const handleCancelBatch = () => {
+    if (window.confirm('Are you sure you want to cancel the batch operation? Any images currently being processed will finish, but no new images will be started.')) {
+        isCancellingRef.current = true;
     }
   };
   
@@ -778,9 +801,18 @@ const App: React.FC = () => {
               >
                   Download All (.zip)
               </button>
+              {isLoading && (
+                  <button
+                      onClick={handleCancelBatch}
+                      className="text-center bg-transparent border border-red-500 text-red-500 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-red-500 hover:text-white active:scale-95 text-base"
+                  >
+                      Cancel Operation
+                  </button>
+              )}
               <button 
                   onClick={handleUploadNew}
-                  className="text-center bg-transparent border border-gray-300 text-gray-700 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 active:scale-95 text-base"
+                  disabled={isLoading}
+                  className="text-center bg-transparent border border-gray-300 text-gray-700 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
                   Exit Batch Mode
               </button>
