@@ -849,8 +849,8 @@ const BatchImageCard: React.FC<{ image: BatchImage }> = ({ image }) => {
         return () => URL.revokeObjectURL(url);
     }, [image.original]);
 
-    const displayUrl = isHovering && image.editedUrl ? image.editedUrl : originalUrl;
     const canToggle = image.status === 'done' && image.editedUrl;
+    const indicatorText = isHovering ? 'Original' : 'Edited';
 
     return (
         <div 
@@ -858,7 +858,17 @@ const BatchImageCard: React.FC<{ image: BatchImage }> = ({ image }) => {
             onMouseEnter={() => canToggle && setIsHovering(true)}
             onMouseLeave={() => canToggle && setIsHovering(false)}
         >
-            <img src={displayUrl} alt={image.original.name} className="w-full h-full object-cover transition-opacity duration-200" />
+            {/* Original Image (Bottom Layer) */}
+            <img src={originalUrl} alt={image.original.name} className="absolute inset-0 w-full h-full object-cover" />
+
+            {/* Edited Image (Top Layer) - visible when available, fades on hover */}
+            {canToggle && (
+                <img 
+                    src={image.editedUrl} 
+                    alt={`${image.original.name} (edited)`} 
+                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ease-in-out ${isHovering ? 'opacity-0' : 'opacity-100'}`} 
+                />
+            )}
             
             <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/60 to-transparent p-2">
                 <p className="text-white text-xs font-medium truncate">{image.original.name}</p>
@@ -877,8 +887,8 @@ const BatchImageCard: React.FC<{ image: BatchImage }> = ({ image }) => {
             )}
             
             {canToggle && (
-                 <div className="absolute top-1 right-1 px-2 py-0.5 text-xs font-bold rounded-full bg-black/50 text-white transition-opacity duration-200 group-hover:opacity-100 opacity-0">
-                    {isHovering ? 'After' : 'Before'}
+                 <div className="absolute top-1 right-1 px-2 py-0.5 text-xs font-bold rounded-full bg-black/50 text-white transition-opacity duration-200 group-hover:opacity-100 opacity-0 z-10">
+                    {indicatorText}
                  </div>
             )}
         </div>
