@@ -60,8 +60,8 @@ const StartScreen: React.FC<StartScreenProps> = ({ onFileSelect }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <FeatureCard 
                     icon={<MagicWandIcon className="w-6 h-6 text-blue-500" />}
-                    title="Precise Retouching"
-                    description="Click any point on your image to remove blemishes, change colors, or add elements with pinpoint accuracy."
+                    title="Magic Edit"
+                    description="Select any area to seamlessly remove unwanted objects, add new elements, or change details with a simple text prompt."
                 />
                 <FeatureCard 
                     icon={<PaletteIcon className="w-6 h-6 text-blue-500" />}

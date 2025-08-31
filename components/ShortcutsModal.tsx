@@ -65,7 +65,7 @@ const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
 
             <div className="mb-6">
                 <h3 className="font-semibold text-gray-600 mb-2">Navigation</h3>
-                <Shortcut keys={['Alt', '1']} description="Switch to Retouch tab" />
+                <Shortcut keys={['Alt', '1']} description="Switch to Edit tab" />
                 <Shortcut keys={['Alt', '2']} description="Switch to Crop tab" />
                 <Shortcut keys={['Alt', '3']} description="Switch to Adjust tab" />
                 <Shortcut keys={['Alt', '4']} description="Switch to Filters tab" />

@@ -36,7 +36,27 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
     return new File([u8arr], filename, {type:mime});
 }
 
-type Tab = 'retouch' | 'adjust' | 'filters' | 'crop';
+// Helper to check if a canvas is empty (all transparent)
+const isCanvasBlank = (canvas: HTMLCanvasElement): boolean => {
+    if (!canvas) return true;
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return true;
+    try {
+        const pixelBuffer = new Uint32Array(
+            context.getImageData(0, 0, canvas.width, canvas.height).data.buffer
+        );
+        // An all-transparent canvas will have all-zero values in the buffer.
+        return !pixelBuffer.some(pixel => pixel !== 0);
+    } catch (e) {
+        // This can happen if the canvas is tainted (e.g. cross-origin data)
+        // or if dimensions are 0. In our case, we can assume it's blank.
+        console.error("Could not check canvas, assuming it's blank.", e);
+        return true;
+    }
+}
+
+
+type Tab = 'edit' | 'adjust' | 'filters' | 'crop';
 type Page = 'editor' | 'faq' | 'inspiration';
 
 type BatchImageStatus = 'pending' | 'processing' | 'done' | 'error';
@@ -61,11 +81,11 @@ const App: React.FC = () => {
   // Common state
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('retouch');
+  const [activeTab, setActiveTab] = useState<Tab>('edit');
   
-  // Retouch-specific state
-  const [retouchCrop, setRetouchCrop] = useState<Crop>();
-  const [completedRetouchCrop, setCompletedRetouchCrop] = useState<PixelCrop>();
+  // Edit-specific state
+  const [editCrop, setEditCrop] = useState<Crop>();
+  const [completedEditCrop, setCompletedEditCrop] = useState<PixelCrop>();
   
   // Crop-specific state
   const [crop, setCrop] = useState<Crop>();
@@ -75,6 +95,13 @@ const App: React.FC = () => {
   // Comparison state
   const [isComparing, setIsComparing] = useState<boolean>(false);
   const imgRef = useRef<HTMLImageElement>(null);
+
+  // Masking state for Adjust/Filters
+  const [isMasking, setIsMasking] = useState<boolean>(false);
+  const [brushSize, setBrushSize] = useState<number>(40);
+  const maskCanvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingRef = useRef<boolean>(false);
+  const lastPositionRef = useRef<{ x: number, y: number } | null>(null);
   
   // State lifted from panels for global shortcuts
   const [adjustmentPrompt, setAdjustmentPrompt] = useState<string>('');
@@ -150,8 +177,8 @@ const App: React.FC = () => {
     // Reset transient states after an action
     setCrop(undefined);
     setCompletedCrop(undefined);
-    setRetouchCrop(undefined);
-    setCompletedRetouchCrop(undefined);
+    setEditCrop(undefined);
+    setCompletedEditCrop(undefined);
   }, [history, historyIndex]);
 
   const handleImageUpload = useCallback((file: File) => {
@@ -159,11 +186,11 @@ const App: React.FC = () => {
     setHistory([file]);
     setHistoryIndex(0);
     setBatchImages([]); // Ensure batch mode is cleared
-    setActiveTab('retouch');
+    setActiveTab('edit');
     setCrop(undefined);
     setCompletedCrop(undefined);
-    setRetouchCrop(undefined);
-    setCompletedRetouchCrop(undefined);
+    setEditCrop(undefined);
+    setCompletedEditCrop(undefined);
   }, []);
 
   const handleGenerate = useCallback(async () => {
@@ -177,7 +204,7 @@ const App: React.FC = () => {
         return;
     }
 
-    if (!completedRetouchCrop || completedRetouchCrop.width === 0) {
+    if (!completedEditCrop || completedEditCrop.width === 0) {
         setError('Please select an area on the image to edit.');
         return;
     }
@@ -186,7 +213,7 @@ const App: React.FC = () => {
     setError(null);
     
     try {
-        const editedImageUrl = await generateEditedImage(currentImage, prompt, completedRetouchCrop);
+        const editedImageUrl = await generateEditedImage(currentImage, prompt, completedEditCrop);
         const newImageFile = dataURLtoFile(editedImageUrl, `edited-${Date.now()}.png`);
         addImageToHistory(newImageFile);
     } catch (err) {
@@ -196,7 +223,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, prompt, completedRetouchCrop, addImageToHistory]);
+  }, [currentImage, prompt, completedEditCrop, addImageToHistory]);
   
   const handleBatchApply = useCallback(async (prompt: string, type: 'filter' | 'adjust') => {
     if (!prompt.trim()) {
@@ -226,7 +253,7 @@ const App: React.FC = () => {
         ));
 
         try {
-            const editedUrl = await editFunction(imageToProcess.original, prompt);
+            const editedUrl = await editFunction(imageToProcess.original, prompt, null); // Masking not supported in batch
             setBatchImages(prev => prev.map(img =>
                 img.id === imageToProcess.id
                     ? { ...img, editedUrl, status: 'done', error: undefined }
@@ -269,7 +296,7 @@ const App: React.FC = () => {
     ));
 
     try {
-        const editedUrl = await editFunction(imageToRetry.original, prompt);
+        const editedUrl = await editFunction(imageToRetry.original, prompt, null);
         setBatchImages(prev => prev.map(img =>
             img.id === imageToRetry.id
                 ? { ...img, editedUrl, status: 'done', error: undefined }
@@ -286,7 +313,47 @@ const App: React.FC = () => {
     }
   }, [activeTab, filterPrompt, adjustmentPrompt]);
 
-  const handleApplyFilter = useCallback(async (filterPrompt: string) => {
+    const getMaskAsFile = useCallback(async (): Promise<File | null> => {
+        const canvas = maskCanvasRef.current;
+        if (!canvas || isCanvasBlank(canvas)) {
+            return null;
+        }
+
+        // Create a new canvas to produce the final black and white mask
+        const outputCanvas = document.createElement('canvas');
+        outputCanvas.width = canvas.width;
+        outputCanvas.height = canvas.height;
+        const ctx = outputCanvas.getContext('2d');
+
+        if (!ctx) return null;
+
+        // Fill with black
+        ctx.fillStyle = 'black';
+        ctx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+
+        // Draw the user's mask in white on top
+        ctx.drawImage(canvas, 0, 0);
+
+        return new Promise((resolve) => {
+            outputCanvas.toBlob((blob) => {
+                if (!blob) {
+                    resolve(null);
+                    return;
+                }
+                resolve(new File([blob], 'mask.png', { type: 'image/png' }));
+            }, 'image/png');
+        });
+    }, []);
+    
+    const handleClearMask = useCallback(() => {
+        const canvas = maskCanvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        if (ctx && canvas) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }, []);
+
+    const handleApplyFilter = useCallback(async (filterPrompt: string) => {
     if (batchImages.length > 0) {
         return handleBatchApply(filterPrompt, 'filter');
     }
@@ -297,9 +364,20 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-        const filteredImageUrl = await generateFilteredImage(currentImage, filterPrompt);
+        let maskFile: File | null = null;
+        if (isMasking) {
+            maskFile = await getMaskAsFile();
+            if (!maskFile) {
+                setError("Masking is enabled, but no mask has been drawn. Please draw on the image or disable masking.");
+                setIsLoading(false);
+                return;
+            }
+        }
+
+        const filteredImageUrl = await generateFilteredImage(currentImage, filterPrompt, maskFile);
         const newImageFile = dataURLtoFile(filteredImageUrl, `filtered-${Date.now()}.png`);
         addImageToHistory(newImageFile);
+        if (isMasking) handleClearMask();
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
         setError(`Failed to apply the filter. ${errorMessage}`);
@@ -307,7 +385,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, addImageToHistory, batchImages, handleBatchApply]);
+  }, [currentImage, addImageToHistory, batchImages, handleBatchApply, isMasking, getMaskAsFile, handleClearMask]);
   
   const handleApplyAdjustment = useCallback(async (adjustmentPrompt: string) => {
     if (batchImages.length > 0) {
@@ -322,9 +400,19 @@ const App: React.FC = () => {
     setError(null);
     
     try {
-        const adjustedImageUrl = await generateAdjustedImage(currentImage, adjustmentPrompt);
+        let maskFile: File | null = null;
+        if (isMasking) {
+            maskFile = await getMaskAsFile();
+            if (!maskFile) {
+                setError("Masking is enabled, but no mask has been drawn. Please draw on the image or disable masking.");
+                setIsLoading(false);
+                return;
+            }
+        }
+        const adjustedImageUrl = await generateAdjustedImage(currentImage, adjustmentPrompt, maskFile);
         const newImageFile = dataURLtoFile(adjustedImageUrl, `adjusted-${Date.now()}.png`);
         addImageToHistory(newImageFile);
+        if (isMasking) handleClearMask();
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
         setError(`Failed to apply the adjustment. ${errorMessage}`);
@@ -332,7 +420,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, addImageToHistory, batchImages, handleBatchApply]);
+  }, [currentImage, addImageToHistory, batchImages, handleBatchApply, isMasking, getMaskAsFile, handleClearMask]);
 
   const handleApplyCrop = useCallback(() => {
     if (!completedCrop || !imgRef.current) {
@@ -381,16 +469,16 @@ const App: React.FC = () => {
   const handleUndo = useCallback(() => {
     if (canUndo) {
       setHistoryIndex(historyIndex - 1);
-      setRetouchCrop(undefined);
-      setCompletedRetouchCrop(undefined);
+      setEditCrop(undefined);
+      setCompletedEditCrop(undefined);
     }
   }, [canUndo, historyIndex]);
   
   const handleRedo = useCallback(() => {
     if (canRedo) {
       setHistoryIndex(historyIndex + 1);
-      setRetouchCrop(undefined);
-      setCompletedRetouchCrop(undefined);
+      setEditCrop(undefined);
+      setCompletedEditCrop(undefined);
     }
   }, [canRedo, historyIndex]);
 
@@ -398,8 +486,8 @@ const App: React.FC = () => {
     if (history.length > 0) {
       setHistoryIndex(0);
       setError(null);
-      setRetouchCrop(undefined);
-      setCompletedRetouchCrop(undefined);
+      setEditCrop(undefined);
+      setCompletedEditCrop(undefined);
     }
   }, [history]);
 
@@ -409,8 +497,8 @@ const App: React.FC = () => {
       setBatchImages([]);
       setError(null);
       setPrompt('');
-      setRetouchCrop(undefined);
-      setCompletedRetouchCrop(undefined);
+      setEditCrop(undefined);
+      setCompletedEditCrop(undefined);
   }, []);
 
   const handleDownload = useCallback(() => {
@@ -499,14 +587,86 @@ const App: React.FC = () => {
     }
   };
 
+  const handleToggleMasking = useCallback(() => {
+    setIsMasking(prev => {
+        if (prev) { // turning it off
+            handleClearMask();
+        } else { // turning it on
+            const canvas = maskCanvasRef.current;
+            const image = imgRef.current;
+            if (canvas && image) {
+                // sync canvas size to image display size
+                canvas.width = image.clientWidth;
+                canvas.height = image.clientHeight;
+            }
+        }
+        return !prev;
+    });
+  }, [handleClearMask]);
+
+
   const handleTabChange = useCallback((tab: Tab) => {
     setActiveTab(tab);
-  }, []);
+    // Disable and clear masking if switching to an incompatible tab
+    if (tab !== 'adjust' && tab !== 'filters' && isMasking) {
+        handleClearMask();
+        setIsMasking(false);
+    }
+  }, [isMasking, handleClearMask]);
 
   const handleTryPrompt = useCallback((prompt: string, type: 'filters' | 'adjust') => {
     setPromptToTry({ prompt, type });
     setCurrentPage('editor');
   }, []);
+
+    const getCoords = (e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } | null => {
+        const canvas = maskCanvasRef.current;
+        if (!canvas) return null;
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
+        };
+    };
+
+    const drawLine = (start: { x: number, y: number }, end: { x: number, y: number }) => {
+        const canvas = maskCanvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        if (!ctx) return;
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = brushSize;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+    };
+
+    const handleMaskMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        isDrawingRef.current = true;
+        const coords = getCoords(e);
+        if (coords) {
+            lastPositionRef.current = coords;
+            // Draw a dot for single clicks
+            drawLine(coords, { x: coords.x, y: coords.y });
+        }
+    };
+
+    const handleMaskMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (!isDrawingRef.current) return;
+        const coords = getCoords(e);
+        if (coords && lastPositionRef.current) {
+            drawLine(lastPositionRef.current, coords);
+            lastPositionRef.current = coords;
+        }
+    };
+
+    const handleMaskMouseUp = () => {
+        isDrawingRef.current = false;
+        lastPositionRef.current = null;
+    };
+
 
   // Keyboard shortcuts effect
   useEffect(() => {
@@ -521,8 +681,8 @@ const App: React.FC = () => {
         if (isLoading) return;
 
         switch (activeTab) {
-          case 'retouch':
-            if (!isBatchMode && prompt.trim() && completedRetouchCrop?.width) handleGenerate();
+          case 'edit':
+            if (!isBatchMode && prompt.trim() && completedEditCrop?.width) handleGenerate();
             break;
           case 'adjust':
             if (adjustmentPrompt.trim()) handleApplyAdjustment(adjustmentPrompt);
@@ -562,7 +722,7 @@ const App: React.FC = () => {
       // Other shortcuts
       if (e.altKey) {
           switch(e.key) {
-              case '1': e.preventDefault(); handleTabChange('retouch'); break;
+              case '1': e.preventDefault(); handleTabChange('edit'); break;
               case '2': e.preventDefault(); handleTabChange('crop'); break;
               case '3': e.preventDefault(); handleTabChange('adjust'); break;
               case '4': e.preventDefault(); handleTabChange('filters'); break;
@@ -603,7 +763,7 @@ const App: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [
-    activeTab, canUndo, completedCrop, prompt, completedRetouchCrop, adjustmentPrompt, filterPrompt, isLoading, currentImage, batchImages,
+    activeTab, canUndo, completedCrop, prompt, completedEditCrop, adjustmentPrompt, filterPrompt, isLoading, currentImage, batchImages,
     handleGenerate, handleApplyAdjustment, handleApplyFilter, handleApplyCrop, 
     handleUndo, handleRedo, handleReset, handleUploadNew, handleDownload, handleTabChange
   ]);
@@ -618,6 +778,14 @@ const App: React.FC = () => {
             className={`w-full h-auto object-contain max-h-[60vh] rounded-xl ${
                 isComparing ? 'opacity-0' : 'opacity-100'
             } transition-opacity duration-200 ease-in-out`}
+            // when the image loads, if masking is enabled, sync the canvas size
+            onLoad={(e) => {
+                if (isMasking && maskCanvasRef.current) {
+                    const img = e.currentTarget;
+                    maskCanvasRef.current.width = img.clientWidth;
+                    maskCanvasRef.current.height = img.clientHeight;
+                }
+            }}
         />
     );
     
@@ -645,6 +813,13 @@ const App: React.FC = () => {
             src={currentImageUrl!} 
             alt="Image to edit"
             className="w-full h-auto object-contain max-h-[60vh] rounded-xl"
+            onLoad={(e) => {
+                if (isMasking && maskCanvasRef.current) {
+                    const img = e.currentTarget;
+                    maskCanvasRef.current.width = img.clientWidth;
+                    maskCanvasRef.current.height = img.clientHeight;
+                }
+            }}
         />
     );
 
@@ -657,35 +832,53 @@ const App: React.FC = () => {
                     <p className="text-gray-300">AI is working its magic...</p>
                 </div>
             )}
-            
-            {activeTab === 'crop' && (
-              <ReactCrop 
-                crop={crop} 
-                onChange={c => setCrop(c)} 
-                onComplete={c => setCompletedCrop(c)}
-                aspect={aspect}
-                className="max-h-[60vh]"
-              >
-                {imageEditorElement}
-              </ReactCrop>
-            )}
 
-            {activeTab === 'retouch' && (
-              <ReactCrop
-                crop={retouchCrop}
-                onChange={c => setRetouchCrop(c)}
-                onComplete={c => setCompletedRetouchCrop(c)}
-                className="max-h-[60vh]"
-              >
-                  {imageEditorElement}
-              </ReactCrop>
-            )}
-            
-            {(activeTab === 'adjust' || activeTab === 'filters') && comparisonImageDisplay}
+            <div className="relative">
+                {activeTab === 'crop' && (
+                  <ReactCrop 
+                    crop={crop} 
+                    onChange={c => setCrop(c)} 
+                    onComplete={c => setCompletedCrop(c)}
+                    aspect={aspect}
+                    className="max-h-[60vh]"
+                  >
+                    {imageEditorElement}
+                  </ReactCrop>
+                )}
+    
+                {activeTab === 'edit' && (
+                  <ReactCrop
+                    crop={editCrop}
+                    onChange={c => setEditCrop(c)}
+                    onComplete={c => setCompletedEditCrop(c)}
+                    className="max-h-[60vh]"
+                  >
+                      {imageEditorElement}
+                  </ReactCrop>
+                )}
+                
+                {(activeTab === 'adjust' || activeTab === 'filters') && comparisonImageDisplay}
+
+                {/* MASKING CANVAS */}
+                {isMasking && (activeTab === 'adjust' || activeTab === 'filters') && (
+                    <canvas
+                        ref={maskCanvasRef}
+                        className="absolute top-0 left-0 w-full h-full cursor-crosshair z-20 pointer-events-auto"
+                        style={{ 
+                            backgroundColor: 'rgba(239, 68, 68, 0.3)', // red-500 with 30% opacity
+                            mixBlendMode: 'screen' 
+                        }}
+                        onMouseDown={handleMaskMouseDown}
+                        onMouseMove={handleMaskMouseMove}
+                        onMouseUp={handleMaskMouseUp}
+                        onMouseLeave={handleMaskMouseUp} // Stop drawing if mouse leaves canvas
+                    />
+                )}
+            </div>
         </div>
         
         <div className="w-full bg-gray-200/80 border border-gray-300/80 rounded-lg p-2 flex items-center justify-center gap-2">
-            {(['retouch', 'crop', 'adjust', 'filters'] as const).map((tab, index) => (
+            {(['edit', 'crop', 'adjust', 'filters'] as const).map((tab, index) => (
                  <button
                     key={tab}
                     onClick={() => handleTabChange(tab)}
@@ -702,25 +895,25 @@ const App: React.FC = () => {
         </div>
         
         <div className="w-full">
-            {activeTab === 'retouch' && (
+            {activeTab === 'edit' && (
                 <div className="flex flex-col items-center gap-4">
                     <p className="text-md text-gray-600">
-                        {completedRetouchCrop?.width ? 'Great! Now describe your localized edit below.' : 'Draw a selection on the image to make a precise edit.'}
+                        {completedEditCrop?.width ? 'Great! Now describe your edit below.' : 'Select an area to remove an object or add something new.'}
                     </p>
                     <form onSubmit={(e) => { e.preventDefault(); handleGenerate(); }} className="w-full flex items-center gap-2">
                         <input
                             type="text"
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
-                            placeholder={completedRetouchCrop?.width ? "e.g., 'change my shirt color to blue'" : "First draw a selection on the image"}
+                            placeholder={completedEditCrop?.width ? "e.g., 'remove the person in the background' or 'add a hat'" : "First draw a selection on the image"}
                             className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-5 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled={isLoading || !completedRetouchCrop?.width}
+                            disabled={isLoading || !completedEditCrop?.width}
                         />
                         <button 
                             type="submit"
                             title="Apply edit (Cmd/Ctrl + Enter)"
                             className="bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-5 px-8 text-lg rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner disabled:from-blue-800 disabled:to-blue-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
-                            disabled={isLoading || !prompt.trim() || !completedRetouchCrop?.width}
+                            disabled={isLoading || !prompt.trim() || !completedEditCrop?.width}
                         >
                             Generate
                         </button>
@@ -728,8 +921,32 @@ const App: React.FC = () => {
                 </div>
             )}
             {activeTab === 'crop' && <CropPanel onApplyCrop={handleApplyCrop} onSetAspect={setAspect} isLoading={isLoading} isCropping={!!completedCrop?.width && completedCrop.width > 0} />}
-            {activeTab === 'adjust' && <AdjustmentPanel onApplyAdjustment={handleApplyAdjustment} isLoading={isLoading} activePrompt={adjustmentPrompt} onPromptChange={setAdjustmentPrompt} />}
-            {activeTab === 'filters' && <FilterPanel onApplyFilter={handleApplyFilter} isLoading={isLoading} activePrompt={filterPrompt} onPromptChange={setFilterPrompt} />}
+            {activeTab === 'adjust' && 
+                <AdjustmentPanel 
+                    onApplyAdjustment={handleApplyAdjustment} 
+                    isLoading={isLoading} 
+                    activePrompt={adjustmentPrompt} 
+                    onPromptChange={setAdjustmentPrompt}
+                    isMasking={isMasking}
+                    onToggleMasking={handleToggleMasking}
+                    brushSize={brushSize}
+                    onBrushSizeChange={(e) => setBrushSize(parseInt(e.target.value, 10))}
+                    onClearMask={handleClearMask}
+                />
+            }
+            {activeTab === 'filters' && 
+                <FilterPanel 
+                    onApplyFilter={handleApplyFilter} 
+                    isLoading={isLoading} 
+                    activePrompt={filterPrompt} 
+                    onPromptChange={setFilterPrompt} 
+                    isMasking={isMasking}
+                    onToggleMasking={handleToggleMasking}
+                    brushSize={brushSize}
+                    onBrushSizeChange={(e) => setBrushSize(parseInt(e.target.value, 10))}
+                    onClearMask={handleClearMask}
+                />
+            }
         </div>
         
         <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
@@ -875,8 +1092,8 @@ const App: React.FC = () => {
           </div>
   
           <div className="w-full max-w-4xl">
-              {activeTab === 'adjust' && <AdjustmentPanel onApplyAdjustment={handleApplyAdjustment} isLoading={isLoading} activePrompt={adjustmentPrompt} onPromptChange={setAdjustmentPrompt} />}
-              {activeTab === 'filters' && <FilterPanel onApplyFilter={handleApplyFilter} isLoading={isLoading} activePrompt={filterPrompt} onPromptChange={setFilterPrompt} />}
+              {activeTab === 'adjust' && <AdjustmentPanel onApplyAdjustment={handleApplyAdjustment} isLoading={isLoading} activePrompt={adjustmentPrompt} onPromptChange={setAdjustmentPrompt} isMasking={false} onToggleMasking={()=>{}} brushSize={0} onBrushSizeChange={()=>{}} onClearMask={()=>{}} />}
+              {activeTab === 'filters' && <FilterPanel onApplyFilter={handleApplyFilter} isLoading={isLoading} activePrompt={filterPrompt} onPromptChange={setFilterPrompt} isMasking={false} onToggleMasking={()=>{}} brushSize={0} onBrushSizeChange={()=>{}} onClearMask={()=>{}}/>}
           </div>
           
           <div className="flex flex-wrap items-center justify-center gap-3 mt-6">

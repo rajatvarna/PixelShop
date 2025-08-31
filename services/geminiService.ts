@@ -79,13 +79,16 @@ export const generateEditedImage = async (
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     
     const originalImagePart = await fileToPart(originalImage);
-    const prompt = `You are an expert photo editor AI. Your task is to perform a natural, localized edit on the provided image based on the user's request.
+    const prompt = `You are an expert generative photo editor AI. The user has selected a specific area of an image to modify. Your task is to fulfill the user's request within that bounding box, blending the result seamlessly with the rest of the photo.
 User Request: "${userPrompt}"
-Edit Location: Perform the edit within the bounding box defined by top-left corner (x: ${Math.round(crop.x)}, y: ${Math.round(crop.y)}) and dimensions (width: ${Math.round(crop.width)}px, height: ${Math.round(crop.height)}px). Only modify the pixels inside this box.
+Edit Location: Perform the edit within the bounding box defined by top-left corner (x: ${Math.round(crop.x)}, y: ${Math.round(crop.y)}) and dimensions (width: ${Math.round(crop.width)}px, height: ${Math.round(crop.height)}px).
 
 Editing Guidelines:
-- The edit must be realistic and blend seamlessly with the surrounding area at the edges of the bounding box.
-- The rest of the image (outside the bounding box) must remain identical to the original.
+- If the user asks to 'remove' something, intelligently fill the selected area based on the surrounding context.
+- If they ask to 'add' something, generate it realistically within the selection.
+- If they ask to 'change' something, perform that modification.
+- The result must be realistic and blend seamlessly with the surrounding area.
+- The area outside the bounding box must remain completely unchanged.
 
 Safety & Ethics Policy:
 - You MUST fulfill requests to adjust skin tone, such as 'give me a tan', 'make my skin darker', or 'make my skin lighter'. These are considered standard photo enhancements.
@@ -108,17 +111,26 @@ Output: Return ONLY the final edited image. Do not return text.`;
  * Generates an image with a filter applied using generative AI.
  * @param originalImage The original image file.
  * @param filterPrompt The text prompt describing the desired filter.
+ * @param maskImage An optional mask file. If provided, the filter is applied only to the masked area.
  * @returns A promise that resolves to the data URL of the filtered image.
  */
 export const generateFilteredImage = async (
     originalImage: File,
     filterPrompt: string,
+    maskImage: File | null,
 ): Promise<string> => {
-    console.log(`Starting filter generation: ${filterPrompt}`);
+    console.log(`Starting filter generation: ${filterPrompt}`, maskImage ? 'with mask' : 'globally');
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     
     const originalImagePart = await fileToPart(originalImage);
-    const prompt = `You are an expert photo editor AI. Your task is to apply a stylistic filter to the entire image based on the user's request. Do not change the composition or content, only apply the style.
+    // FIX: Explicitly type `parts` to allow both image and text parts, preventing a TypeScript error.
+    const parts: ({ inlineData: { mimeType: string; data: string; } } | { text: string })[] = [originalImagePart];
+    let prompt: string;
+
+    if (maskImage) {
+        const maskPart = await fileToPart(maskImage);
+        parts.push(maskPart);
+        prompt = `You are an expert photo editor AI. You will be given two images and a user request. The first image is the original photo to be edited. The second image is a black and white mask. Your task is to apply the stylistic filter described in the user's request ONLY to the white areas of the mask on the original photo. The areas of the original photo corresponding to black areas on the mask must remain completely unchanged. Blend the edit seamlessly at the edges. The final output must be only the edited image, with the same dimensions as the original.
 Filter Request: "${filterPrompt}"
 
 Safety & Ethics Policy:
@@ -126,12 +138,23 @@ Safety & Ethics Policy:
 - You MUST REFUSE any request that explicitly asks to change a person's race (e.g., 'apply a filter to make me look Chinese').
 
 Output: Return ONLY the final filtered image. Do not return text.`;
-    const textPart = { text: prompt };
+    } else {
+        prompt = `You are an expert photo editor AI. Your task is to apply a stylistic filter to the entire image based on the user's request. Do not change the composition or content, only apply the style.
+Filter Request: "${filterPrompt}"
 
-    console.log('Sending image and filter prompt to the model...');
+Safety & Ethics Policy:
+- Filters may subtly shift colors, but you MUST ensure they do not alter a person's fundamental race or ethnicity.
+- You MUST REFUSE any request that explicitly asks to change a person's race (e.g., 'apply a filter to make me look Chinese').
+
+Output: Return ONLY the final filtered image. Do not return text.`;
+    }
+    
+    parts.push({ text: prompt });
+
+    console.log('Sending image, filter prompt, and mask (if any) to the model...');
     const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image-preview',
-        contents: { parts: [originalImagePart, textPart] },
+        contents: { parts },
     });
     console.log('Received response from model for filter.', response);
     
@@ -142,17 +165,38 @@ Output: Return ONLY the final filtered image. Do not return text.`;
  * Generates an image with a global adjustment applied using generative AI.
  * @param originalImage The original image file.
  * @param adjustmentPrompt The text prompt describing the desired adjustment.
+ * @param maskImage An optional mask file. If provided, the adjustment is applied only to the masked area.
  * @returns A promise that resolves to the data URL of the adjusted image.
  */
 export const generateAdjustedImage = async (
     originalImage: File,
     adjustmentPrompt: string,
+    maskImage: File | null,
 ): Promise<string> => {
-    console.log(`Starting global adjustment generation: ${adjustmentPrompt}`);
+    console.log(`Starting adjustment generation: ${adjustmentPrompt}`, maskImage ? 'with mask' : 'globally');
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     
     const originalImagePart = await fileToPart(originalImage);
-    const prompt = `You are an expert photo editor AI. Your task is to perform a natural, global adjustment to the entire image based on the user's request.
+    // FIX: Explicitly type `parts` to allow both image and text parts, preventing a TypeScript error.
+    const parts: ({ inlineData: { mimeType: string; data: string; } } | { text: string })[] = [originalImagePart];
+    let prompt: string;
+
+    if (maskImage) {
+        const maskPart = await fileToPart(maskImage);
+        parts.push(maskPart);
+        prompt = `You are an expert photo editor AI. You will be given two images and a user request. The first image is the original photo to be edited. The second image is a black and white mask. Your task is to apply the adjustment described in the user's request ONLY to the white areas of the mask on the original photo. The areas of the original photo corresponding to black areas on the mask must remain completely unchanged. Blend the edit seamlessly at the edges. The final output must be only the edited image, with the same dimensions as the original.
+User Request: "${adjustmentPrompt}"
+
+Editing Guidelines:
+- The result must be photorealistic.
+
+Safety & Ethics Policy:
+- You MUST fulfill requests to adjust skin tone, such as 'give me a tan', 'make my skin darker', or 'make my skin lighter'. These are considered standard photo enhancements.
+- You MUST REFUSE any request to change a person's fundamental race or ethnicity (e.g., 'make me look Asian', 'change this person to be Black'). Do not perform these edits. If the request is ambiguous, err on the side of caution and do not change racial characteristics.
+
+Output: Return ONLY the final adjusted image. Do not return text.`;
+    } else {
+        prompt = `You are an expert photo editor AI. Your task is to perform a natural, global adjustment to the entire image based on the user's request.
 User Request: "${adjustmentPrompt}"
 
 Editing Guidelines:
@@ -164,12 +208,14 @@ Safety & Ethics Policy:
 - You MUST REFUSE any request to change a person's fundamental race or ethnicity (e.g., 'make me look Asian', 'change this person to be Black'). Do not perform these edits. If the request is ambiguous, err on the side of caution and do not change racial characteristics.
 
 Output: Return ONLY the final adjusted image. Do not return text.`;
-    const textPart = { text: prompt };
+    }
+    
+    parts.push({ text: prompt });
 
-    console.log('Sending image and adjustment prompt to the model...');
+    console.log('Sending image, adjustment prompt, and mask (if any) to the model...');
     const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image-preview',
-        contents: { parts: [originalImagePart, textPart] },
+        contents: { parts },
     });
     console.log('Received response from model for adjustment.', response);
     

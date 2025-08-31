@@ -10,9 +10,24 @@ interface FilterPanelProps {
   isLoading: boolean;
   activePrompt: string;
   onPromptChange: (prompt: string) => void;
+  isMasking: boolean;
+  onToggleMasking: () => void;
+  brushSize: number;
+  onBrushSizeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onClearMask: () => void;
 }
 
-const FilterPanel: React.FC<FilterPanelProps> = ({ onApplyFilter, isLoading, activePrompt, onPromptChange }) => {
+const FilterPanel: React.FC<FilterPanelProps> = ({ 
+  onApplyFilter, 
+  isLoading, 
+  activePrompt, 
+  onPromptChange,
+  isMasking,
+  onToggleMasking,
+  brushSize,
+  onBrushSizeChange,
+  onClearMask
+}) => {
 
   const presets = [
     { name: 'Synthwave', prompt: 'Apply a vibrant 80s synthwave aesthetic with neon magenta and cyan glows, and subtle scan lines.' },
@@ -37,7 +52,34 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ onApplyFilter, isLoading, act
 
   return (
     <div className="w-full bg-gray-100 border border-gray-300 rounded-lg p-4 flex flex-col gap-4 animate-fade-in">
-      <h3 className="text-lg font-semibold text-center text-gray-700">Apply a Filter</h3>
+        <div className="flex justify-between items-center pb-2 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-700">{isMasking ? 'Filter a Specific Area' : 'Apply a Global Filter'}</h3>
+            <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">Apply to:</span>
+                <button
+                    onClick={onToggleMasking}
+                    title={isMasking ? "Switch to editing the whole image" : "Switch to editing a specific area"}
+                    className={`px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 ${
+                        isMasking
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-200 text-gray-700'
+                    }`}
+                >
+                    {isMasking ? 'Masked Area' : 'Whole Image'}
+                </button>
+            </div>
+        </div>
+
+      {isMasking && (
+         <div className="p-3 bg-blue-500/10 rounded-lg flex flex-col sm:flex-row items-center gap-4 animate-fade-in">
+            <p className="text-sm text-blue-800 font-medium flex-shrink-0">Draw on the image to select an area.</p>
+            <div className="flex items-center gap-2">
+                <label htmlFor="brush-size" className="text-sm font-medium text-gray-700 whitespace-nowrap">Brush Size:</label>
+                <input id="brush-size" type="range" min="10" max="100" step="1" value={brushSize} onChange={onBrushSizeChange} className="w-24 cursor-pointer" />
+            </div>
+            <button onClick={onClearMask} className="text-sm text-blue-600 hover:underline font-semibold ml-auto flex-shrink-0">Clear Mask</button>
+         </div>
+      )}
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
         {presets.map(preset => (
