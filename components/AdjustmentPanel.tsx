@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React from 'react';
+import React, { useState } from 'react';
 import PromptSuggestions from './PromptSuggestions';
+import PromptHistoryDropdown from './PromptHistoryDropdown';
 import { adjustmentSuggestions } from '../data/suggestions';
 
 interface AdjustmentPanelProps {
@@ -17,6 +18,8 @@ interface AdjustmentPanelProps {
   brushSize: number;
   onBrushSizeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onClearMask: () => void;
+  promptHistory: string[];
+  onClearHistory: () => void;
 }
 
 const AdjustmentPanel: React.FC<AdjustmentPanelProps> = ({ 
@@ -28,8 +31,12 @@ const AdjustmentPanel: React.FC<AdjustmentPanelProps> = ({
   onToggleMasking, 
   brushSize, 
   onBrushSizeChange, 
-  onClearMask 
+  onClearMask,
+  promptHistory,
+  onClearHistory
 }) => {
+  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
+
   const presets = [
     { name: 'Blur Background', prompt: 'Apply a realistic depth-of-field effect, making the background blurry while keeping the main subject in sharp focus.' },
     { name: 'Enhance Details', prompt: 'Slightly enhance the sharpness and details of the image without making it look unnatural.' },
@@ -95,14 +102,27 @@ const AdjustmentPanel: React.FC<AdjustmentPanelProps> = ({
         ))}
       </div>
 
-      <input
-        type="text"
-        value={activePrompt}
-        onChange={handleCustomChange}
-        placeholder="Or describe an adjustment (e.g., 'change background to a forest')"
-        className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60 text-base"
-        disabled={isLoading}
-      />
+      <div className="relative w-full">
+        <input
+          type="text"
+          value={activePrompt}
+          onChange={handleCustomChange}
+          onFocus={() => setIsHistoryVisible(true)}
+          onBlur={() => setTimeout(() => setIsHistoryVisible(false), 200)} // Delay to allow click on dropdown
+          placeholder="Or describe an adjustment (e.g., 'change background to a forest')"
+          className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60 text-base"
+          disabled={isLoading}
+        />
+        <PromptHistoryDropdown
+          isVisible={isHistoryVisible}
+          history={promptHistory}
+          onSelect={(p) => {
+              onPromptChange(p);
+              setIsHistoryVisible(false);
+          }}
+          onClear={onClearHistory}
+        />
+      </div>
 
       <PromptSuggestions 
         suggestions={adjustmentSuggestions} 

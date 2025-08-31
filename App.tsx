@@ -19,6 +19,7 @@ import FaqPage from './components/FaqPage';
 import InspirationPage from './components/InspirationPage';
 import JSZip from 'jszip';
 import PromptSuggestions from './components/PromptSuggestions';
+import PromptHistoryDropdown from './components/PromptHistoryDropdown';
 import { editSuggestions } from './data/suggestions';
 
 // Helper to convert a data URL string to a File object
@@ -56,6 +57,54 @@ const isCanvasBlank = (canvas: HTMLCanvasElement): boolean => {
         return true;
     }
 }
+
+// --- Prompt History Hook ---
+const MAX_HISTORY_SIZE = 20;
+
+const usePromptHistory = (storageKey: string) => {
+    const [history, setHistory] = useState<string[]>([]);
+
+    useEffect(() => {
+        try {
+            const storedHistory = localStorage.getItem(storageKey);
+            if (storedHistory) {
+                setHistory(JSON.parse(storedHistory));
+            }
+        } catch (error) {
+            console.error(`Failed to read prompt history from localStorage for key ${storageKey}`, error);
+        }
+    }, [storageKey]);
+
+    const addPrompt = useCallback((prompt: string) => {
+        if (!prompt || !prompt.trim()) return;
+        const newPrompt = prompt.trim();
+
+        setHistory(prevHistory => {
+            // Remove existing instance to move it to the top.
+            const filteredHistory = prevHistory.filter(p => p.toLowerCase() !== newPrompt.toLowerCase());
+            const newHistory = [newPrompt, ...filteredHistory].slice(0, MAX_HISTORY_SIZE);
+            
+            try {
+                localStorage.setItem(storageKey, JSON.stringify(newHistory));
+            } catch (error) {
+                console.error(`Failed to save prompt history to localStorage for key ${storageKey}`, error);
+            }
+            
+            return newHistory;
+        });
+    }, [storageKey]);
+
+    const clearHistory = useCallback(() => {
+        setHistory([]);
+        try {
+            localStorage.removeItem(storageKey);
+        } catch (error) {
+            console.error(`Failed to clear prompt history from localStorage for key ${storageKey}`, error);
+        }
+    }, [storageKey]);
+
+    return { history, addPrompt, clearHistory };
+};
 
 
 type Tab = 'edit' | 'adjust' | 'filters' | 'crop';
@@ -113,6 +162,12 @@ const App: React.FC = () => {
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('editor');
   const [promptToTry, setPromptToTry] = useState<{ prompt: string; type: Tab } | null>(null);
+  const [isEditHistoryVisible, setIsEditHistoryVisible] = useState(false);
+
+  // Prompt History
+  const { history: editHistory, addPrompt: addEditPrompt, clearHistory: clearEditHistory } = usePromptHistory('pixelshop_edit_history');
+  const { history: adjustHistory, addPrompt: addAdjustPrompt, clearHistory: clearAdjustHistory } = usePromptHistory('pixelshop_adjust_history');
+  const { history: filterHistory, addPrompt: addFilterPrompt, clearHistory: clearFilterHistory } = usePromptHistory('pixelshop_filter_history');
 
   const currentImage = history[historyIndex] ?? null;
   const originalImage = history[0] ?? null;
@@ -218,6 +273,7 @@ const App: React.FC = () => {
         const editedImageUrl = await generateEditedImage(currentImage, prompt, completedEditCrop);
         const newImageFile = dataURLtoFile(editedImageUrl, `edited-${Date.now()}.png`);
         addImageToHistory(newImageFile);
+        addEditPrompt(prompt);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
         setError(`Failed to generate the image. ${errorMessage}`);
@@ -225,7 +281,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, prompt, completedEditCrop, addImageToHistory]);
+  }, [currentImage, prompt, completedEditCrop, addImageToHistory, addEditPrompt]);
   
   const handleBatchApply = useCallback(async (prompt: string, type: 'filter' | 'adjust') => {
     if (!prompt.trim()) {
@@ -241,6 +297,13 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     isCancellingRef.current = false; // Reset on new run
+
+    // Add to history at the start of a successful batch
+    if (type === 'filter') {
+        addFilterPrompt(prompt);
+    } else {
+        addAdjustPrompt(prompt);
+    }
 
     const editFunction = type === 'filter' ? generateFilteredImage : generateAdjustedImage;
 
@@ -274,7 +337,7 @@ const App: React.FC = () => {
 
     setIsLoading(false);
     isCancellingRef.current = false;
-  }, [batchImages]);
+  }, [batchImages, addFilterPrompt, addAdjustPrompt]);
   
   const handleRetryImage = useCallback(async (imageToRetry: BatchImage) => {
     const type = activeTab === 'filters' ? 'filter' : 'adjust';
@@ -379,6 +442,7 @@ const App: React.FC = () => {
         const filteredImageUrl = await generateFilteredImage(currentImage, filterPrompt, maskFile);
         const newImageFile = dataURLtoFile(filteredImageUrl, `filtered-${Date.now()}.png`);
         addImageToHistory(newImageFile);
+        addFilterPrompt(filterPrompt);
         if (isMasking) handleClearMask();
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
@@ -387,7 +451,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, addImageToHistory, batchImages, handleBatchApply, isMasking, getMaskAsFile, handleClearMask]);
+  }, [currentImage, addImageToHistory, batchImages, handleBatchApply, isMasking, getMaskAsFile, handleClearMask, addFilterPrompt]);
   
   const handleApplyAdjustment = useCallback(async (adjustmentPrompt: string) => {
     if (batchImages.length > 0) {
@@ -414,6 +478,7 @@ const App: React.FC = () => {
         const adjustedImageUrl = await generateAdjustedImage(currentImage, adjustmentPrompt, maskFile);
         const newImageFile = dataURLtoFile(adjustedImageUrl, `adjusted-${Date.now()}.png`);
         addImageToHistory(newImageFile);
+        addAdjustPrompt(adjustmentPrompt);
         if (isMasking) handleClearMask();
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
@@ -422,7 +487,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, addImageToHistory, batchImages, handleBatchApply, isMasking, getMaskAsFile, handleClearMask]);
+  }, [currentImage, addImageToHistory, batchImages, handleBatchApply, isMasking, getMaskAsFile, handleClearMask, addAdjustPrompt]);
 
   const handleApplyCrop = useCallback(() => {
     if (!completedCrop || !imgRef.current) {
@@ -892,14 +957,25 @@ const App: React.FC = () => {
                         {completedEditCrop?.width ? 'Great! Now describe your edit below.' : 'Select an area to remove an object or add something new.'}
                     </p>
                     <form onSubmit={(e) => { e.preventDefault(); handleGenerate(); }} className="w-full flex flex-col items-center gap-2">
-                        <div className="w-full flex items-center gap-2">
+                        <div className="relative w-full flex items-center gap-2">
                             <input
                                 type="text"
                                 value={prompt}
                                 onChange={(e) => setPrompt(e.target.value)}
+                                onFocus={() => setIsEditHistoryVisible(true)}
+                                onBlur={() => setTimeout(() => setIsEditHistoryVisible(false), 200)} // Delay to allow click on dropdown
                                 placeholder={completedEditCrop?.width ? "e.g., 'remove the person in the background' or 'add a hat'" : "First draw a selection on the image"}
                                 className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-5 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60"
                                 disabled={isLoading || !completedEditCrop?.width}
+                            />
+                             <PromptHistoryDropdown
+                                isVisible={isEditHistoryVisible}
+                                history={editHistory}
+                                onSelect={(p) => {
+                                    setPrompt(p);
+                                    setIsEditHistoryVisible(false);
+                                }}
+                                onClear={clearEditHistory}
                             />
                             <button
                                 type="submit"
@@ -934,6 +1010,8 @@ const App: React.FC = () => {
                     brushSize={brushSize}
                     onBrushSizeChange={(e) => setBrushSize(parseInt(e.target.value, 10))}
                     onClearMask={handleClearMask}
+                    promptHistory={adjustHistory}
+                    onClearHistory={clearAdjustHistory}
                 />
             }
             {activeTab === 'filters' &&
@@ -947,6 +1025,8 @@ const App: React.FC = () => {
                     brushSize={brushSize}
                     onBrushSizeChange={(e) => setBrushSize(parseInt(e.target.value, 10))}
                     onClearMask={handleClearMask}
+                    promptHistory={filterHistory}
+                    onClearHistory={clearFilterHistory}
                 />
             }
         </div>
@@ -1094,8 +1174,8 @@ const App: React.FC = () => {
           </div>
   
           <div className="w-full max-w-4xl">
-              {activeTab === 'adjust' && <AdjustmentPanel onApplyAdjustment={handleApplyAdjustment} isLoading={isLoading} activePrompt={adjustmentPrompt} onPromptChange={setAdjustmentPrompt} isMasking={false} onToggleMasking={()=>{}} brushSize={0} onBrushSizeChange={()=>{}} onClearMask={()=>{}} />}
-              {activeTab === 'filters' && <FilterPanel onApplyFilter={handleApplyFilter} isLoading={isLoading} activePrompt={filterPrompt} onPromptChange={setFilterPrompt} isMasking={false} onToggleMasking={()=>{}} brushSize={0} onBrushSizeChange={()=>{}} onClearMask={()=>{}}/>}
+              {activeTab === 'adjust' && <AdjustmentPanel onApplyAdjustment={handleApplyAdjustment} isLoading={isLoading} activePrompt={adjustmentPrompt} onPromptChange={setAdjustmentPrompt} isMasking={false} onToggleMasking={()=>{}} brushSize={0} onBrushSizeChange={()=>{}} onClearMask={()=>{}} promptHistory={adjustHistory} onClearHistory={clearAdjustHistory} />}
+              {activeTab === 'filters' && <FilterPanel onApplyFilter={handleApplyFilter} isLoading={isLoading} activePrompt={filterPrompt} onPromptChange={setFilterPrompt} isMasking={false} onToggleMasking={()=>{}} brushSize={0} onBrushSizeChange={()=>{}} onClearMask={()=>{}} promptHistory={filterHistory} onClearHistory={clearFilterHistory}/>}
           </div>
           
           <div className="flex flex-wrap items-center justify-center gap-3 mt-6">

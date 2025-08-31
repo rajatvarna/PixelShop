@@ -3,8 +3,9 @@
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React from 'react';
+import React, { useState } from 'react';
 import PromptSuggestions from './PromptSuggestions';
+import PromptHistoryDropdown from './PromptHistoryDropdown';
 import { filterSuggestions } from '../data/suggestions';
 
 interface FilterPanelProps {
@@ -17,6 +18,8 @@ interface FilterPanelProps {
   brushSize: number;
   onBrushSizeChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onClearMask: () => void;
+  promptHistory: string[];
+  onClearHistory: () => void;
 }
 
 const FilterPanel: React.FC<FilterPanelProps> = ({ 
@@ -28,8 +31,11 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   onToggleMasking,
   brushSize,
   onBrushSizeChange,
-  onClearMask
+  onClearMask,
+  promptHistory,
+  onClearHistory
 }) => {
+  const [isHistoryVisible, setIsHistoryVisible] = useState(false);
 
   const presets = [
     { name: 'Synthwave', prompt: 'Apply a vibrant 80s synthwave aesthetic with neon magenta and cyan glows, and subtle scan lines.' },
@@ -96,14 +102,27 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         ))}
       </div>
 
-      <input
-        type="text"
-        value={activePrompt}
-        onChange={handleCustomChange}
-        placeholder="Or describe a custom filter (e.g., '80s synthwave glow')"
-        className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60 text-base"
-        disabled={isLoading}
-      />
+      <div className="relative w-full">
+        <input
+          type="text"
+          value={activePrompt}
+          onChange={handleCustomChange}
+          onFocus={() => setIsHistoryVisible(true)}
+          onBlur={() => setTimeout(() => setIsHistoryVisible(false), 200)} // Delay to allow click on dropdown
+          placeholder="Or describe a custom filter (e.g., '80s synthwave glow')"
+          className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60 text-base"
+          disabled={isLoading}
+        />
+        <PromptHistoryDropdown
+          isVisible={isHistoryVisible}
+          history={promptHistory}
+          onSelect={(p) => {
+              onPromptChange(p);
+              setIsHistoryVisible(false);
+          }}
+          onClear={onClearHistory}
+        />
+      </div>
       
       <PromptSuggestions 
         suggestions={filterSuggestions} 
