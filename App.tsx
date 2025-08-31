@@ -771,49 +771,13 @@ const App: React.FC = () => {
   ]);
 
   const renderSingleImageEditor = () => {
-    const imageToDisplay = (
+    // A reusable component for the current image element, used by the editor and comparison view.
+    const currentImageElement = (
         <img
             ref={imgRef}
             key={currentImageUrl}
             src={currentImageUrl!}
             alt="Current"
-            className={`w-full h-auto object-contain max-h-[60vh] rounded-xl ${
-                isComparing ? 'opacity-0' : 'opacity-100'
-            } transition-opacity duration-200 ease-in-out`}
-            // when the image loads, if masking is enabled, sync the canvas size
-            onLoad={(e) => {
-                if (isMasking && maskCanvasRef.current) {
-                    const img = e.currentTarget;
-                    maskCanvasRef.current.width = img.clientWidth;
-                    maskCanvasRef.current.height = img.clientHeight;
-                }
-            }}
-        />
-    );
-    
-    // An image with an overlay for comparison purposes
-    const comparisonImageDisplay = (
-      <div className="relative">
-        {originalImageUrl && (
-            <img
-                key={originalImageUrl}
-                src={originalImageUrl}
-                alt="Original"
-                className="w-full h-auto object-contain max-h-[60vh] rounded-xl pointer-events-none"
-            />
-        )}
-        <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-200 ease-in-out ${isComparing ? 'opacity-0' : 'opacity-100'}`}>
-            {imageToDisplay}
-        </div>
-      </div>
-    );
-
-    const imageEditorElement = (
-        <img 
-            ref={imgRef}
-            key={`crop-source-${currentImageUrl}`}
-            src={currentImageUrl!} 
-            alt="Image to edit"
             className="w-full h-auto object-contain max-h-[60vh] rounded-xl"
             onLoad={(e) => {
                 if (isMasking && maskCanvasRef.current) {
@@ -824,6 +788,37 @@ const App: React.FC = () => {
             }}
         />
     );
+
+    // Determines the interactive editor content based on the active tab
+    const editorContent = (() => {
+        if (activeTab === 'crop') {
+            return (
+              <ReactCrop
+                crop={crop}
+                onChange={c => setCrop(c)}
+                onComplete={c => setCompletedCrop(c)}
+                aspect={aspect}
+                className="max-h-[60vh]"
+              >
+                {currentImageElement}
+              </ReactCrop>
+            );
+        }
+        if (activeTab === 'edit') {
+            return (
+              <ReactCrop
+                crop={editCrop}
+                onChange={c => setEditCrop(c)}
+                onComplete={c => setCompletedEditCrop(c)}
+                className="max-h-[60vh]"
+              >
+                  {currentImageElement}
+              </ReactCrop>
+            );
+        }
+        // For 'adjust' and 'filters', it's just the plain image
+        return currentImageElement;
+    })();
 
     return (
       <div className="w-full max-w-4xl mx-auto flex flex-col items-center gap-6 animate-fade-in">
@@ -836,39 +831,33 @@ const App: React.FC = () => {
             )}
 
             <div className="relative">
-                {activeTab === 'crop' && (
-                  <ReactCrop 
-                    crop={crop} 
-                    onChange={c => setCrop(c)} 
-                    onComplete={c => setCompletedCrop(c)}
-                    aspect={aspect}
-                    className="max-h-[60vh]"
-                  >
-                    {imageEditorElement}
-                  </ReactCrop>
-                )}
-    
-                {activeTab === 'edit' && (
-                  <ReactCrop
-                    crop={editCrop}
-                    onChange={c => setEditCrop(c)}
-                    onComplete={c => setCompletedEditCrop(c)}
-                    className="max-h-[60vh]"
-                  >
-                      {imageEditorElement}
-                  </ReactCrop>
-                )}
-                
-                {(activeTab === 'adjust' || activeTab === 'filters') && comparisonImageDisplay}
+                {/*
+                  This container provides the comparison functionality.
+                  The original image is the base layer, and the editor content is the top layer.
+                  When `isComparing` is true, the top layer fades out to reveal the original.
+                */}
+                <div className="relative">
+                    {originalImageUrl && (
+                        <img
+                            key={originalImageUrl}
+                            src={originalImageUrl}
+                            alt="Original"
+                            className="w-full h-auto object-contain max-h-[60vh] rounded-xl pointer-events-none"
+                        />
+                    )}
+                    <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-200 ease-in-out ${isComparing ? 'opacity-0' : 'opacity-100'}`}>
+                        {editorContent}
+                    </div>
+                </div>
 
-                {/* MASKING CANVAS */}
+                {/* MASKING CANVAS - overlays the comparison view */}
                 {isMasking && (activeTab === 'adjust' || activeTab === 'filters') && (
                     <canvas
                         ref={maskCanvasRef}
                         className="absolute top-0 left-0 w-full h-full cursor-crosshair z-20 pointer-events-auto"
-                        style={{ 
+                        style={{
                             backgroundColor: 'rgba(239, 68, 68, 0.3)', // red-500 with 30% opacity
-                            mixBlendMode: 'screen' 
+                            mixBlendMode: 'screen'
                         }}
                         onMouseDown={handleMaskMouseDown}
                         onMouseMove={handleMaskMouseMove}
@@ -878,7 +867,7 @@ const App: React.FC = () => {
                 )}
             </div>
         </div>
-        
+
         <div className="w-full bg-gray-200/80 border border-gray-300/80 rounded-lg p-2 flex items-center justify-center gap-2">
             {(['edit', 'crop', 'adjust', 'filters'] as const).map((tab, index) => (
                  <button
@@ -886,8 +875,8 @@ const App: React.FC = () => {
                     onClick={() => handleTabChange(tab)}
                     title={`Switch to ${tab} (Alt + ${index + 1})`}
                     className={`w-full capitalize font-semibold py-3 px-5 rounded-md transition-all duration-200 text-base ${
-                        activeTab === tab 
-                        ? 'bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-lg shadow-cyan-500/40' 
+                        activeTab === tab
+                        ? 'bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-lg shadow-cyan-500/40'
                         : 'text-gray-600 hover:bg-gray-300/50 hover:text-gray-900'
                     }`}
                 >
@@ -895,7 +884,7 @@ const App: React.FC = () => {
                 </button>
             ))}
         </div>
-        
+
         <div className="w-full">
             {activeTab === 'edit' && (
                 <div className="flex flex-col items-center gap-4">
@@ -912,7 +901,7 @@ const App: React.FC = () => {
                                 className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-5 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60"
                                 disabled={isLoading || !completedEditCrop?.width}
                             />
-                            <button 
+                            <button
                                 type="submit"
                                 title="Apply edit (Cmd/Ctrl + Enter)"
                                 className="bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-5 px-8 text-lg rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner disabled:from-blue-800 disabled:to-blue-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
@@ -923,8 +912,8 @@ const App: React.FC = () => {
                         </div>
                          {completedEditCrop?.width && (
                             <div className="w-full mt-2 animate-fade-in">
-                               <PromptSuggestions 
-                                    suggestions={editSuggestions} 
+                               <PromptSuggestions
+                                    suggestions={editSuggestions}
                                     onSelect={(prompt) => setPrompt(prompt)}
                                     isLoading={isLoading}
                                />
@@ -934,11 +923,11 @@ const App: React.FC = () => {
                 </div>
             )}
             {activeTab === 'crop' && <CropPanel onApplyCrop={handleApplyCrop} onSetAspect={setAspect} isLoading={isLoading} isCropping={!!completedCrop?.width && completedCrop.width > 0} />}
-            {activeTab === 'adjust' && 
-                <AdjustmentPanel 
-                    onApplyAdjustment={handleApplyAdjustment} 
-                    isLoading={isLoading} 
-                    activePrompt={adjustmentPrompt} 
+            {activeTab === 'adjust' &&
+                <AdjustmentPanel
+                    onApplyAdjustment={handleApplyAdjustment}
+                    isLoading={isLoading}
+                    activePrompt={adjustmentPrompt}
                     onPromptChange={setAdjustmentPrompt}
                     isMasking={isMasking}
                     onToggleMasking={handleToggleMasking}
@@ -947,12 +936,12 @@ const App: React.FC = () => {
                     onClearMask={handleClearMask}
                 />
             }
-            {activeTab === 'filters' && 
-                <FilterPanel 
-                    onApplyFilter={handleApplyFilter} 
-                    isLoading={isLoading} 
-                    activePrompt={filterPrompt} 
-                    onPromptChange={setFilterPrompt} 
+            {activeTab === 'filters' &&
+                <FilterPanel
+                    onApplyFilter={handleApplyFilter}
+                    isLoading={isLoading}
+                    activePrompt={filterPrompt}
+                    onPromptChange={setFilterPrompt}
                     isMasking={isMasking}
                     onToggleMasking={handleToggleMasking}
                     brushSize={brushSize}
@@ -961,9 +950,9 @@ const App: React.FC = () => {
                 />
             }
         </div>
-        
+
         <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
-            <button 
+            <button
                 onClick={handleUndo}
                 disabled={!canUndo}
                 title="Undo (Cmd/Ctrl + Z)"
@@ -973,7 +962,7 @@ const App: React.FC = () => {
                 <UndoIcon className="w-5 h-5 mr-2" />
                 Undo
             </button>
-            <button 
+            <button
                 onClick={handleRedo}
                 disabled={!canRedo}
                 title="Redo (Cmd/Ctrl + Shift + Z or Ctrl + Y)"
@@ -983,11 +972,11 @@ const App: React.FC = () => {
                 <RedoIcon className="w-5 h-5 mr-2" />
                 Redo
             </button>
-            
+
             <div className="h-6 w-px bg-gray-400 mx-1 hidden sm:block"></div>
 
             {canUndo && (
-              <button 
+              <button
                   onMouseDown={() => setIsComparing(true)}
                   onMouseUp={() => setIsComparing(false)}
                   onMouseLeave={() => setIsComparing(false)}
@@ -1002,7 +991,7 @@ const App: React.FC = () => {
               </button>
             )}
 
-            <button 
+            <button
                 onClick={handleReset}
                 disabled={!canUndo}
                 title="Reset to original image (Alt + R)"
@@ -1010,7 +999,7 @@ const App: React.FC = () => {
               >
                 Reset
             </button>
-            <button 
+            <button
                 onClick={handleUploadNew}
                 title="Upload a new image (Alt + U)"
                 className="text-center bg-transparent border border-gray-300 text-gray-700 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 active:scale-95 text-base"
@@ -1018,7 +1007,7 @@ const App: React.FC = () => {
                 Upload New
             </button>
 
-            <button 
+            <button
                 onClick={handleDownload}
                 title="Download image (Cmd/Ctrl + S)"
                 className="flex-grow sm:flex-grow-0 ml-auto bg-gradient-to-br from-green-600 to-green-500 text-white font-bold py-3 px-5 rounded-md transition-all duration-300 ease-in-out shadow-lg shadow-green-500/20 hover:shadow-xl hover:shadow-green-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner text-base"
