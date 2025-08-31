@@ -4,6 +4,8 @@
 */
 
 import React from 'react';
+import PromptSuggestions from './PromptSuggestions';
+import { adjustmentSuggestions } from '../data/suggestions';
 
 interface AdjustmentPanelProps {
   onApplyAdjustment: (prompt: string) => void;
@@ -100,6 +102,12 @@ const AdjustmentPanel: React.FC<AdjustmentPanelProps> = ({
         placeholder="Or describe an adjustment (e.g., 'change background to a forest')"
         className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60 text-base"
         disabled={isLoading}
+      />
+
+      <PromptSuggestions 
+        suggestions={adjustmentSuggestions} 
+        onSelect={(prompt) => onPromptChange(prompt)}
+        isLoading={isLoading}
       />
 
       {activePrompt && (

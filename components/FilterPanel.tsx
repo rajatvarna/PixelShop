@@ -4,6 +4,8 @@
 */
 
 import React from 'react';
+import PromptSuggestions from './PromptSuggestions';
+import { filterSuggestions } from '../data/suggestions';
 
 interface FilterPanelProps {
   onApplyFilter: (prompt: string) => void;
@@ -103,6 +105,12 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
         disabled={isLoading}
       />
       
+      <PromptSuggestions 
+        suggestions={filterSuggestions} 
+        onSelect={(prompt) => onPromptChange(prompt)}
+        isLoading={isLoading}
+      />
+
       {activePrompt && (
         <div className="animate-fade-in flex flex-col gap-4 pt-2">
           <button

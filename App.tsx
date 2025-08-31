@@ -18,6 +18,8 @@ import ShortcutsModal from './components/ShortcutsModal';
 import FaqPage from './components/FaqPage';
 import InspirationPage from './components/InspirationPage';
 import JSZip from 'jszip';
+import PromptSuggestions from './components/PromptSuggestions';
+import { editSuggestions } from './data/suggestions';
 
 // Helper to convert a data URL string to a File object
 const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -900,23 +902,34 @@ const App: React.FC = () => {
                     <p className="text-md text-gray-600">
                         {completedEditCrop?.width ? 'Great! Now describe your edit below.' : 'Select an area to remove an object or add something new.'}
                     </p>
-                    <form onSubmit={(e) => { e.preventDefault(); handleGenerate(); }} className="w-full flex items-center gap-2">
-                        <input
-                            type="text"
-                            value={prompt}
-                            onChange={(e) => setPrompt(e.target.value)}
-                            placeholder={completedEditCrop?.width ? "e.g., 'remove the person in the background' or 'add a hat'" : "First draw a selection on the image"}
-                            className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-5 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled={isLoading || !completedEditCrop?.width}
-                        />
-                        <button 
-                            type="submit"
-                            title="Apply edit (Cmd/Ctrl + Enter)"
-                            className="bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-5 px-8 text-lg rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner disabled:from-blue-800 disabled:to-blue-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
-                            disabled={isLoading || !prompt.trim() || !completedEditCrop?.width}
-                        >
-                            Generate
-                        </button>
+                    <form onSubmit={(e) => { e.preventDefault(); handleGenerate(); }} className="w-full flex flex-col items-center gap-2">
+                        <div className="w-full flex items-center gap-2">
+                            <input
+                                type="text"
+                                value={prompt}
+                                onChange={(e) => setPrompt(e.target.value)}
+                                placeholder={completedEditCrop?.width ? "e.g., 'remove the person in the background' or 'add a hat'" : "First draw a selection on the image"}
+                                className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-5 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60"
+                                disabled={isLoading || !completedEditCrop?.width}
+                            />
+                            <button 
+                                type="submit"
+                                title="Apply edit (Cmd/Ctrl + Enter)"
+                                className="bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-5 px-8 text-lg rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner disabled:from-blue-800 disabled:to-blue-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
+                                disabled={isLoading || !prompt.trim() || !completedEditCrop?.width}
+                            >
+                                Generate
+                            </button>
+                        </div>
+                         {completedEditCrop?.width && (
+                            <div className="w-full mt-2 animate-fade-in">
+                               <PromptSuggestions 
+                                    suggestions={editSuggestions} 
+                                    onSelect={(prompt) => setPrompt(prompt)}
+                                    isLoading={isLoading}
+                               />
+                            </div>
+                        )}
                     </form>
                 </div>
             )}
