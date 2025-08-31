@@ -67,25 +67,25 @@ const handleApiResponse = (
  * Generates an edited image using generative AI based on a text prompt and a specific point.
  * @param originalImage The original image file.
  * @param userPrompt The text prompt describing the desired edit.
- * @param hotspot The {x, y} coordinates on the image to focus the edit.
+ * @param crop The pixel crop selection for the edit area.
  * @returns A promise that resolves to the data URL of the edited image.
  */
 export const generateEditedImage = async (
     originalImage: File,
     userPrompt: string,
-    hotspot: { x: number, y: number }
+    crop: { x: number; y: number; width: number; height: number; }
 ): Promise<string> => {
-    console.log('Starting generative edit at:', hotspot);
+    console.log('Starting generative edit in selection:', crop);
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     
     const originalImagePart = await fileToPart(originalImage);
     const prompt = `You are an expert photo editor AI. Your task is to perform a natural, localized edit on the provided image based on the user's request.
 User Request: "${userPrompt}"
-Edit Location: Focus on the area around pixel coordinates (x: ${hotspot.x}, y: ${hotspot.y}).
+Edit Location: Perform the edit within the bounding box defined by top-left corner (x: ${Math.round(crop.x)}, y: ${Math.round(crop.y)}) and dimensions (width: ${Math.round(crop.width)}px, height: ${Math.round(crop.height)}px). Only modify the pixels inside this box.
 
 Editing Guidelines:
-- The edit must be realistic and blend seamlessly with the surrounding area.
-- The rest of the image (outside the immediate edit area) must remain identical to the original.
+- The edit must be realistic and blend seamlessly with the surrounding area at the edges of the bounding box.
+- The rest of the image (outside the bounding box) must remain identical to the original.
 
 Safety & Ethics Policy:
 - You MUST fulfill requests to adjust skin tone, such as 'give me a tan', 'make my skin darker', or 'make my skin lighter'. These are considered standard photo enhancements.

@@ -64,8 +64,8 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('retouch');
   
   // Retouch-specific state
-  const [editHotspot, setEditHotspot] = useState<{ x: number, y: number } | null>(null);
-  const [displayHotspot, setDisplayHotspot] = useState<{ x: number, y: number } | null>(null);
+  const [retouchCrop, setRetouchCrop] = useState<Crop>();
+  const [completedRetouchCrop, setCompletedRetouchCrop] = useState<PixelCrop>();
   
   // Crop-specific state
   const [crop, setCrop] = useState<Crop>();
@@ -150,6 +150,8 @@ const App: React.FC = () => {
     // Reset transient states after an action
     setCrop(undefined);
     setCompletedCrop(undefined);
+    setRetouchCrop(undefined);
+    setCompletedRetouchCrop(undefined);
   }, [history, historyIndex]);
 
   const handleImageUpload = useCallback((file: File) => {
@@ -157,11 +159,11 @@ const App: React.FC = () => {
     setHistory([file]);
     setHistoryIndex(0);
     setBatchImages([]); // Ensure batch mode is cleared
-    setEditHotspot(null);
-    setDisplayHotspot(null);
     setActiveTab('retouch');
     setCrop(undefined);
     setCompletedCrop(undefined);
+    setRetouchCrop(undefined);
+    setCompletedRetouchCrop(undefined);
   }, []);
 
   const handleGenerate = useCallback(async () => {
@@ -175,8 +177,8 @@ const App: React.FC = () => {
         return;
     }
 
-    if (!editHotspot) {
-        setError('Please click on the image to select an area to edit.');
+    if (!completedRetouchCrop || completedRetouchCrop.width === 0) {
+        setError('Please select an area on the image to edit.');
         return;
     }
 
@@ -184,11 +186,9 @@ const App: React.FC = () => {
     setError(null);
     
     try {
-        const editedImageUrl = await generateEditedImage(currentImage, prompt, editHotspot);
+        const editedImageUrl = await generateEditedImage(currentImage, prompt, completedRetouchCrop);
         const newImageFile = dataURLtoFile(editedImageUrl, `edited-${Date.now()}.png`);
         addImageToHistory(newImageFile);
-        setEditHotspot(null);
-        setDisplayHotspot(null);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
         setError(`Failed to generate the image. ${errorMessage}`);
@@ -196,7 +196,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, prompt, editHotspot, addImageToHistory]);
+  }, [currentImage, prompt, completedRetouchCrop, addImageToHistory]);
   
   const handleBatchApply = useCallback(async (prompt: string, type: 'filter' | 'adjust') => {
     if (!prompt.trim()) {
@@ -247,6 +247,45 @@ const App: React.FC = () => {
     isCancellingRef.current = false;
   }, [batchImages]);
   
+  const handleRetryImage = useCallback(async (imageToRetry: BatchImage) => {
+    const type = activeTab === 'filters' ? 'filter' : 'adjust';
+    if (activeTab !== 'adjust' && activeTab !== 'filters') {
+        setError("Please switch to 'Adjust' or 'Filters' tab to set a prompt before retrying.");
+        return;
+    }
+    const prompt = type === 'filter' ? filterPrompt : adjustmentPrompt;
+
+    if (!prompt.trim()) {
+        setError(`Please enter a prompt for the batch ${type} to retry.`);
+        return;
+    }
+    
+    setError(null);
+
+    const editFunction = type === 'filter' ? generateFilteredImage : generateAdjustedImage;
+
+    setBatchImages(prev => prev.map(img => 
+        img.id === imageToRetry.id ? { ...img, status: 'processing', error: undefined } : img
+    ));
+
+    try {
+        const editedUrl = await editFunction(imageToRetry.original, prompt);
+        setBatchImages(prev => prev.map(img =>
+            img.id === imageToRetry.id
+                ? { ...img, editedUrl, status: 'done', error: undefined }
+                : img
+        ));
+    } catch (err) {
+        const message = err instanceof Error ? err.message : 'An unknown error occurred.';
+        console.error(`Retry failed for ${imageToRetry.original.name}:`, err);
+        setBatchImages(prev => prev.map(img =>
+            img.id === imageToRetry.id
+                ? { ...img, status: 'error', error: message }
+                : img
+        ));
+    }
+  }, [activeTab, filterPrompt, adjustmentPrompt]);
+
   const handleApplyFilter = useCallback(async (filterPrompt: string) => {
     if (batchImages.length > 0) {
         return handleBatchApply(filterPrompt, 'filter');
@@ -342,16 +381,16 @@ const App: React.FC = () => {
   const handleUndo = useCallback(() => {
     if (canUndo) {
       setHistoryIndex(historyIndex - 1);
-      setEditHotspot(null);
-      setDisplayHotspot(null);
+      setRetouchCrop(undefined);
+      setCompletedRetouchCrop(undefined);
     }
   }, [canUndo, historyIndex]);
   
   const handleRedo = useCallback(() => {
     if (canRedo) {
       setHistoryIndex(historyIndex + 1);
-      setEditHotspot(null);
-      setDisplayHotspot(null);
+      setRetouchCrop(undefined);
+      setCompletedRetouchCrop(undefined);
     }
   }, [canRedo, historyIndex]);
 
@@ -359,8 +398,8 @@ const App: React.FC = () => {
     if (history.length > 0) {
       setHistoryIndex(0);
       setError(null);
-      setEditHotspot(null);
-      setDisplayHotspot(null);
+      setRetouchCrop(undefined);
+      setCompletedRetouchCrop(undefined);
     }
   }, [history]);
 
@@ -370,8 +409,8 @@ const App: React.FC = () => {
       setBatchImages([]);
       setError(null);
       setPrompt('');
-      setEditHotspot(null);
-      setDisplayHotspot(null);
+      setRetouchCrop(undefined);
+      setCompletedRetouchCrop(undefined);
   }, []);
 
   const handleDownload = useCallback(() => {
@@ -460,27 +499,6 @@ const App: React.FC = () => {
     }
   };
 
-  const handleImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
-    if (activeTab !== 'retouch') return;
-    
-    const img = e.currentTarget;
-    const rect = img.getBoundingClientRect();
-
-    const offsetX = e.clientX - rect.left;
-    const offsetY = e.clientY - rect.top;
-    
-    setDisplayHotspot({ x: offsetX, y: offsetY });
-
-    const { naturalWidth, naturalHeight, clientWidth, clientHeight } = img;
-    const scaleX = naturalWidth / clientWidth;
-    const scaleY = naturalHeight / clientHeight;
-
-    const originalX = Math.round(offsetX * scaleX);
-    const originalY = Math.round(offsetY * scaleY);
-
-    setEditHotspot({ x: originalX, y: originalY });
-  };
-
   const handleTabChange = useCallback((tab: Tab) => {
     setActiveTab(tab);
   }, []);
@@ -504,7 +522,7 @@ const App: React.FC = () => {
 
         switch (activeTab) {
           case 'retouch':
-            if (!isBatchMode && prompt.trim() && editHotspot) handleGenerate();
+            if (!isBatchMode && prompt.trim() && completedRetouchCrop?.width) handleGenerate();
             break;
           case 'adjust':
             if (adjustmentPrompt.trim()) handleApplyAdjustment(adjustmentPrompt);
@@ -585,15 +603,27 @@ const App: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [
-    activeTab, canUndo, completedCrop, prompt, editHotspot, adjustmentPrompt, filterPrompt, isLoading, currentImage, batchImages,
+    activeTab, canUndo, completedCrop, prompt, completedRetouchCrop, adjustmentPrompt, filterPrompt, isLoading, currentImage, batchImages,
     handleGenerate, handleApplyAdjustment, handleApplyFilter, handleApplyCrop, 
     handleUndo, handleRedo, handleReset, handleUploadNew, handleDownload, handleTabChange
   ]);
 
   const renderSingleImageEditor = () => {
-    const imageDisplay = (
+    const imageToDisplay = (
+        <img
+            ref={imgRef}
+            key={currentImageUrl}
+            src={currentImageUrl!}
+            alt="Current"
+            className={`w-full h-auto object-contain max-h-[60vh] rounded-xl ${
+                isComparing ? 'opacity-0' : 'opacity-100'
+            } transition-opacity duration-200 ease-in-out`}
+        />
+    );
+    
+    // An image with an overlay for comparison purposes
+    const comparisonImageDisplay = (
       <div className="relative">
-        {/* Base image is the original, always at the bottom */}
         {originalImageUrl && (
             <img
                 key={originalImageUrl}
@@ -602,27 +632,20 @@ const App: React.FC = () => {
                 className="w-full h-auto object-contain max-h-[60vh] rounded-xl pointer-events-none"
             />
         )}
-        {/* The current image is an overlay that fades in/out for comparison */}
-        <img
-            ref={imgRef}
-            key={currentImageUrl}
-            src={currentImageUrl!}
-            alt="Current"
-            onClick={handleImageClick}
-            className={`absolute top-0 left-0 w-full h-auto object-contain max-h-[60vh] rounded-xl transition-opacity duration-200 ease-in-out ${isComparing ? 'opacity-0' : 'opacity-100'} ${activeTab === 'retouch' ? 'cursor-crosshair' : ''}`}
-        />
+        <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-200 ease-in-out ${isComparing ? 'opacity-0' : 'opacity-100'}`}>
+            {imageToDisplay}
+        </div>
       </div>
     );
-    
-    // For ReactCrop, we need a single image element. We'll use the current one.
-    const cropImageElement = (
-      <img 
-        ref={imgRef}
-        key={`crop-${currentImageUrl}`}
-        src={currentImageUrl!} 
-        alt="Crop this image"
-        className="w-full h-auto object-contain max-h-[60vh] rounded-xl"
-      />
+
+    const imageEditorElement = (
+        <img 
+            ref={imgRef}
+            key={`crop-source-${currentImageUrl}`}
+            src={currentImageUrl!} 
+            alt="Image to edit"
+            className="w-full h-auto object-contain max-h-[60vh] rounded-xl"
+        />
     );
 
     return (
@@ -635,7 +658,7 @@ const App: React.FC = () => {
                 </div>
             )}
             
-            {activeTab === 'crop' ? (
+            {activeTab === 'crop' && (
               <ReactCrop 
                 crop={crop} 
                 onChange={c => setCrop(c)} 
@@ -643,18 +666,22 @@ const App: React.FC = () => {
                 aspect={aspect}
                 className="max-h-[60vh]"
               >
-                {cropImageElement}
+                {imageEditorElement}
               </ReactCrop>
-            ) : imageDisplay }
-
-            {displayHotspot && !isLoading && activeTab === 'retouch' && (
-                <div 
-                    className="absolute rounded-full w-6 h-6 bg-blue-500/50 border-2 border-white pointer-events-none -translate-x-1/2 -translate-y-1/2 z-10"
-                    style={{ left: `${displayHotspot.x}px`, top: `${displayHotspot.y}px` }}
-                >
-                    <div className="absolute inset-0 rounded-full w-6 h-6 animate-ping bg-blue-400"></div>
-                </div>
             )}
+
+            {activeTab === 'retouch' && (
+              <ReactCrop
+                crop={retouchCrop}
+                onChange={c => setRetouchCrop(c)}
+                onComplete={c => setCompletedRetouchCrop(c)}
+                className="max-h-[60vh]"
+              >
+                  {imageEditorElement}
+              </ReactCrop>
+            )}
+            
+            {(activeTab === 'adjust' || activeTab === 'filters') && comparisonImageDisplay}
         </div>
         
         <div className="w-full bg-gray-200/80 border border-gray-300/80 rounded-lg p-2 flex items-center justify-center gap-2">
@@ -678,22 +705,22 @@ const App: React.FC = () => {
             {activeTab === 'retouch' && (
                 <div className="flex flex-col items-center gap-4">
                     <p className="text-md text-gray-600">
-                        {editHotspot ? 'Great! Now describe your localized edit below.' : 'Click an area on the image to make a precise edit.'}
+                        {completedRetouchCrop?.width ? 'Great! Now describe your localized edit below.' : 'Draw a selection on the image to make a precise edit.'}
                     </p>
                     <form onSubmit={(e) => { e.preventDefault(); handleGenerate(); }} className="w-full flex items-center gap-2">
                         <input
                             type="text"
                             value={prompt}
                             onChange={(e) => setPrompt(e.target.value)}
-                            placeholder={editHotspot ? "e.g., 'change my shirt color to blue'" : "First click a point on the image"}
+                            placeholder={completedRetouchCrop?.width ? "e.g., 'change my shirt color to blue'" : "First draw a selection on the image"}
                             className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-5 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled={isLoading || !editHotspot}
+                            disabled={isLoading || !completedRetouchCrop?.width}
                         />
                         <button 
                             type="submit"
                             title="Apply edit (Cmd/Ctrl + Enter)"
                             className="bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-5 px-8 text-lg rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner disabled:from-blue-800 disabled:to-blue-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
-                            disabled={isLoading || !prompt.trim() || !editHotspot}
+                            disabled={isLoading || !prompt.trim() || !completedRetouchCrop?.width}
                         >
                             Generate
                         </button>
@@ -826,7 +853,7 @@ const App: React.FC = () => {
           
           <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4 bg-gray-200/50 rounded-lg">
               {batchImages.map(image => (
-                  <BatchImageCard key={image.id} image={image} onDownload={handleDownloadIndividual} />
+                  <BatchImageCard key={image.id} image={image} onDownload={handleDownloadIndividual} onRetry={handleRetryImage} />
               ))}
           </div>
   
@@ -936,9 +963,10 @@ const App: React.FC = () => {
 interface BatchImageCardProps {
     image: BatchImage;
     onDownload: (editedUrl: string, originalName: string) => void;
+    onRetry: (image: BatchImage) => void;
 }
 
-const BatchImageCard: React.FC<BatchImageCardProps> = ({ image, onDownload }) => {
+const BatchImageCard: React.FC<BatchImageCardProps> = ({ image, onDownload, onRetry }) => {
     const [originalUrl, setOriginalUrl] = useState('');
     const [isHovering, setIsHovering] = useState(false);
 
@@ -994,6 +1022,13 @@ const BatchImageCard: React.FC<BatchImageCardProps> = ({ image, onDownload }) =>
                  <div className="absolute inset-0 bg-red-900/80 flex flex-col items-center justify-center text-white p-2 text-center animate-fade-in">
                     <p className="font-bold text-sm">Error</p>
                     <p className="text-xs mt-1 leading-tight">{image.error?.substring(0, 60)}...</p>
+                    <button
+                        onClick={() => onRetry(image)}
+                        className="mt-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 text-white font-semibold rounded-full text-xs transition-colors"
+                        aria-label={`Retry processing for ${image.original.name}`}
+                    >
+                        Retry
+                    </button>
                  </div>
             )}
             
