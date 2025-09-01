@@ -864,6 +864,7 @@ const App: React.FC = () => {
                 onComplete={c => setCompletedCrop(c)}
                 aspect={aspect}
                 className="max-h-[60vh]"
+                disabled={isComparing}
               >
                 {currentImageElement}
               </ReactCrop>
@@ -876,6 +877,7 @@ const App: React.FC = () => {
                 onChange={c => setEditCrop(c)}
                 onComplete={c => setCompletedEditCrop(c)}
                 className="max-h-[60vh]"
+                disabled={isComparing}
               >
                   {currentImageElement}
               </ReactCrop>
@@ -889,13 +891,23 @@ const App: React.FC = () => {
       <div className="w-full max-w-4xl mx-auto flex flex-col items-center gap-6 animate-fade-in">
         <div className="relative w-full shadow-2xl rounded-xl overflow-hidden bg-gray-200">
             {isLoading && (
-                <div className="absolute inset-0 bg-black/70 z-30 flex flex-col items-center justify-center gap-4 animate-fade-in">
+                <div className="absolute inset-0 bg-black/70 z-40 flex flex-col items-center justify-center gap-4 animate-fade-in">
                     <Spinner />
                     <p className="text-gray-300">AI is working its magic...</p>
                 </div>
             )}
 
             <div className="relative">
+                {/* Before/After Labels */}
+                <div className={`absolute top-3 left-3 px-3 py-1 text-sm font-bold rounded-full bg-black/60 text-white transition-opacity duration-300 z-30 ${isComparing ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                    Before
+                </div>
+                {canUndo && (
+                    <div className={`absolute top-3 left-3 px-3 py-1 text-sm font-bold rounded-full bg-black/60 text-white transition-opacity duration-300 z-30 ${!isComparing ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                        After
+                    </div>
+                )}
+                
                 {/*
                   This container provides the comparison functionality.
                   The original image is the base layer, and the editor content is the top layer.
@@ -921,8 +933,8 @@ const App: React.FC = () => {
                         ref={maskCanvasRef}
                         className="absolute top-0 left-0 w-full h-full cursor-crosshair z-20 pointer-events-auto"
                         style={{
-                            backgroundColor: 'rgba(239, 68, 68, 0.3)', // red-500 with 30% opacity
-                            mixBlendMode: 'screen'
+                            backgroundColor: 'rgba(230, 0, 0, 0.1)',
+                            pointerEvents: isComparing ? 'none' : 'auto',
                         }}
                         onMouseDown={handleMaskMouseDown}
                         onMouseMove={handleMaskMouseMove}
@@ -931,325 +943,394 @@ const App: React.FC = () => {
                     />
                 )}
             </div>
+
+            {/* ERROR MESSAGE */}
+            {error && (
+              <div 
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 w-11/12 max-w-2xl bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50 animate-fade-in"
+                role="alert"
+              >
+                <strong className="font-bold">Error: </strong>
+                <span className="block sm:inline">{error}</span>
+                <button 
+                  onClick={() => setError(null)}
+                  className="absolute top-0 bottom-0 right-0 px-4 py-3"
+                  aria-label="Close error message"
+                >
+                  <span className="text-2xl text-red-500">&times;</span>
+                </button>
+              </div>
+            )}
         </div>
 
-        <div className="w-full bg-gray-200/80 border border-gray-300/80 rounded-lg p-2 flex items-center justify-center gap-2">
-            {(['edit', 'crop', 'adjust', 'filters'] as const).map((tab, index) => (
-                 <button
+        {/* --- CONTROLS --- */}
+        <div className="w-full flex flex-col-reverse md:flex-row items-center justify-between gap-4">
+            {/* Left Side: Undo/Redo/Reset */}
+            <div className="flex items-center gap-2">
+                <button 
+                    onClick={handleUndo} 
+                    disabled={!canUndo || isLoading} 
+                    title="Undo (Cmd/Ctrl + Z)"
+                    className="p-3 bg-gray-200 text-gray-700 rounded-full transition-colors hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <UndoIcon className="w-5 h-5" />
+                </button>
+                <button 
+                    onClick={handleRedo} 
+                    disabled={!canRedo || isLoading} 
+                    title="Redo (Cmd/Ctrl + Shift + Z)"
+                    className="p-3 bg-gray-200 text-gray-700 rounded-full transition-colors hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <RedoIcon className="w-5 h-5" />
+                </button>
+                <button 
+                    onClick={handleReset} 
+                    disabled={!canUndo || isLoading}
+                    title="Reset all changes (Alt + R)"
+                    className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-200 rounded-full hover:bg-gray-300 disabled:opacity-50"
+                >
+                    Reset
+                </button>
+            </div>
+            {/* Center: Tabs */}
+            <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-full">
+              {(['edit', 'crop', 'adjust', 'filters'] as const).map(tab => (
+                  <button
                     key={tab}
                     onClick={() => handleTabChange(tab)}
-                    title={`Switch to ${tab} (Alt + ${index + 1})`}
-                    className={`w-full capitalize font-semibold py-3 px-5 rounded-md transition-all duration-200 text-base ${
-                        activeTab === tab
-                        ? 'bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-lg shadow-cyan-500/40'
-                        : 'text-gray-600 hover:bg-gray-300/50 hover:text-gray-900'
-                    }`}
-                >
+                    className={`px-5 py-2 text-sm sm:text-base font-semibold rounded-full capitalize transition-all duration-300 ${activeTab === tab ? 'bg-white text-gray-800 shadow' : 'text-gray-500 hover:bg-gray-300/50'}`}
+                  >
                     {tab}
+                  </button>
+              ))}
+            </div>
+            {/* Right Side: Compare/Download */}
+            <div className="flex items-center gap-2">
+                <button 
+                    onMouseDown={() => canUndo && setIsComparing(true)}
+                    onMouseUp={() => setIsComparing(false)}
+                    onMouseLeave={() => setIsComparing(false)}
+                    disabled={!canUndo || isLoading}
+                    title="Hold to compare with original (Hold C)"
+                    className="px-4 py-2 flex items-center gap-2 font-semibold text-gray-600 bg-gray-200 rounded-full hover:bg-gray-300 disabled:opacity-50"
+                >
+                    <EyeIcon className="w-5 h-5" />
+                    Compare
                 </button>
-            ))}
+                <button 
+                    onClick={handleDownload}
+                    title="Download image (Cmd/Ctrl + S)"
+                    className="p-3 bg-blue-600 text-white rounded-full transition-colors hover:bg-blue-500 shadow-md shadow-blue-500/30"
+                >
+                    <DownloadIcon className="w-5 h-5" />
+                </button>
+                <button
+                    onClick={handleUploadNew}
+                    title="Upload new image (Alt + U)"
+                    className="px-4 py-2 text-sm font-semibold text-blue-600 bg-blue-100 rounded-full hover:bg-blue-200"
+                >
+                    Upload New
+                </button>
+            </div>
         </div>
 
-        <div className="w-full">
-            {activeTab === 'edit' && (
-                <div className="flex flex-col items-center gap-4">
-                    <p className="text-md text-gray-600">
-                        {completedEditCrop?.width ? 'Great! Now describe your edit below.' : 'Select an area to remove an object or add something new.'}
-                    </p>
-                    <form onSubmit={(e) => { e.preventDefault(); handleGenerate(); }} className="w-full flex flex-col items-center gap-2">
-                        <div className="relative w-full flex items-center gap-2">
-                            <input
-                                type="text"
-                                value={prompt}
-                                onChange={(e) => setPrompt(e.target.value)}
-                                onFocus={() => setIsEditHistoryVisible(true)}
-                                onBlur={() => setTimeout(() => setIsEditHistoryVisible(false), 200)} // Delay to allow click on dropdown
-                                placeholder={completedEditCrop?.width ? "e.g., 'remove the person in the background' or 'add a hat'" : "First draw a selection on the image"}
-                                className="flex-grow bg-white border border-gray-300 text-gray-800 rounded-lg p-5 text-lg focus:ring-2 focus:ring-blue-500 focus:outline-none transition w-full disabled:cursor-not-allowed disabled:opacity-60"
-                                disabled={isLoading || !completedEditCrop?.width}
-                            />
-                             <PromptHistoryDropdown
-                                isVisible={isEditHistoryVisible}
-                                history={editHistory}
-                                onSelect={(p) => {
-                                    setPrompt(p);
-                                    setIsEditHistoryVisible(false);
-                                }}
-                                onClear={clearEditHistory}
-                            />
-                            <button
-                                type="submit"
-                                title="Apply edit (Cmd/Ctrl + Enter)"
-                                className="bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-5 px-8 text-lg rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner disabled:from-blue-800 disabled:to-blue-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
-                                disabled={isLoading || !prompt.trim() || !completedEditCrop?.width}
-                            >
-                                Generate
-                            </button>
-                        </div>
-                         {completedEditCrop?.width && (
-                            <div className="w-full mt-2 animate-fade-in">
-                               <PromptSuggestions
-                                    suggestions={editSuggestions}
-                                    onSelect={(prompt) => setPrompt(prompt)}
-                                    isLoading={isLoading}
-                               />
-                            </div>
-                        )}
-                    </form>
+        {/* --- PANELS --- */}
+        {activeTab === 'edit' && (
+          <div className="w-full bg-gray-100 border border-gray-300 rounded-lg p-4 flex flex-col items-center gap-4 animate-fade-in">
+              <h3 className="text-lg font-semibold text-gray-700">Magic Edit</h3>
+              <p className="text-sm text-gray-500 -mt-2">Select an area on the image, then describe how to change it.</p>
+              <div className="relative w-full max-w-xl">
+                  <input
+                      type="text"
+                      value={prompt}
+                      onFocus={() => setIsEditHistoryVisible(true)}
+                      onBlur={() => setTimeout(() => setIsEditHistoryVisible(false), 200)} // Delay to allow click on dropdown
+                      onChange={(e) => setPrompt(e.target.value)}
+                      placeholder="e.g., 'remove the person in the background'"
+                      className="w-full bg-white border border-gray-300 text-gray-800 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition disabled:cursor-not-allowed disabled:opacity-60 text-base"
+                      disabled={isLoading || !completedEditCrop}
+                  />
+                   <PromptHistoryDropdown
+                    isVisible={isEditHistoryVisible}
+                    history={editHistory}
+                    onSelect={(p) => {
+                        setPrompt(p);
+                        setIsEditHistoryVisible(false);
+                    }}
+                    onClear={clearEditHistory}
+                   />
+              </div>
+
+              {completedEditCrop && (
+                <PromptSuggestions 
+                    suggestions={editSuggestions}
+                    onSelect={setPrompt}
+                    isLoading={isLoading}
+                />
+              )}
+
+              <button
+                  onClick={handleGenerate}
+                  disabled={isLoading || !prompt.trim() || !completedEditCrop?.width}
+                  title="Generate edit (Cmd/Ctrl + Enter)"
+                  className="w-full max-w-xs mt-2 bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-4 px-6 rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner text-base disabled:from-blue-800 disabled:to-blue-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
+              >
+                  Generate
+              </button>
+          </div>
+        )}
+        {activeTab === 'crop' && (
+          <CropPanel 
+            onApplyCrop={handleApplyCrop} 
+            onSetAspect={setAspect}
+            isLoading={isLoading}
+            isCropping={!!completedCrop?.width && completedCrop.width > 0}
+          />
+        )}
+        {activeTab === 'adjust' && (
+          <AdjustmentPanel 
+            onApplyAdjustment={handleApplyAdjustment} 
+            isLoading={isLoading} 
+            activePrompt={adjustmentPrompt}
+            onPromptChange={setAdjustmentPrompt}
+            isMasking={isMasking}
+            onToggleMasking={handleToggleMasking}
+            brushSize={brushSize}
+            onBrushSizeChange={(e) => setBrushSize(Number(e.target.value))}
+            onClearMask={handleClearMask}
+            promptHistory={adjustHistory}
+            onClearHistory={clearAdjustHistory}
+          />
+        )}
+        {activeTab === 'filters' && (
+          <FilterPanel 
+            onApplyFilter={handleApplyFilter} 
+            isLoading={isLoading} 
+            activePrompt={filterPrompt}
+            onPromptChange={setFilterPrompt}
+            isMasking={isMasking}
+            onToggleMasking={handleToggleMasking}
+            brushSize={brushSize}
+            onBrushSizeChange={(e) => setBrushSize(Number(e.target.value))}
+            onClearMask={handleClearMask}
+            promptHistory={filterHistory}
+            onClearHistory={clearFilterHistory}
+          />
+        )}
+      </div>
+    );
+  };
+  
+  const BatchImageCard: React.FC<{ image: BatchImage; onDownload: () => void; onRetry: () => void }> = ({ image, onDownload, onRetry }) => {
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        const url = URL.createObjectURL(image.original);
+        setPreviewUrl(url);
+        return () => URL.revokeObjectURL(url);
+    }, [image.original]);
+    
+    return (
+        <div className="relative aspect-square bg-gray-200 rounded-lg overflow-hidden shadow-md group">
+            <img 
+                src={previewUrl ?? undefined} 
+                alt={image.original.name} 
+                className="w-full h-full object-cover"
+            />
+            {image.status === 'processing' && (
+                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 text-white">
+                    <Spinner />
+                    <span className="text-sm font-semibold">Processing...</span>
                 </div>
             )}
-            {activeTab === 'crop' && <CropPanel onApplyCrop={handleApplyCrop} onSetAspect={setAspect} isLoading={isLoading} isCropping={!!completedCrop?.width && completedCrop.width > 0} />}
-            {activeTab === 'adjust' &&
-                <AdjustmentPanel
-                    onApplyAdjustment={handleApplyAdjustment}
-                    isLoading={isLoading}
-                    activePrompt={adjustmentPrompt}
-                    onPromptChange={setAdjustmentPrompt}
-                    isMasking={isMasking}
-                    onToggleMasking={handleToggleMasking}
-                    brushSize={brushSize}
-                    onBrushSizeChange={(e) => setBrushSize(parseInt(e.target.value, 10))}
-                    onClearMask={handleClearMask}
-                    promptHistory={adjustHistory}
-                    onClearHistory={clearAdjustHistory}
-                />
-            }
-            {activeTab === 'filters' &&
-                <FilterPanel
-                    onApplyFilter={handleApplyFilter}
-                    isLoading={isLoading}
-                    activePrompt={filterPrompt}
-                    onPromptChange={setFilterPrompt}
-                    isMasking={isMasking}
-                    onToggleMasking={handleToggleMasking}
-                    brushSize={brushSize}
-                    onBrushSizeChange={(e) => setBrushSize(parseInt(e.target.value, 10))}
-                    onClearMask={handleClearMask}
-                    promptHistory={filterHistory}
-                    onClearHistory={clearFilterHistory}
-                />
-            }
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
-            <button
-                onClick={handleUndo}
-                disabled={!canUndo}
-                title="Undo (Cmd/Ctrl + Z)"
-                className="flex items-center justify-center text-center bg-transparent border border-gray-300 text-gray-700 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent"
-                aria-label="Undo last action"
-            >
-                <UndoIcon className="w-5 h-5 mr-2" />
-                Undo
-            </button>
-            <button
-                onClick={handleRedo}
-                disabled={!canRedo}
-                title="Redo (Cmd/Ctrl + Shift + Z or Ctrl + Y)"
-                className="flex items-center justify-center text-center bg-transparent border border-gray-300 text-gray-700 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent"
-                aria-label="Redo last action"
-            >
-                <RedoIcon className="w-5 h-5 mr-2" />
-                Redo
-            </button>
-
-            <div className="h-6 w-px bg-gray-400 mx-1 hidden sm:block"></div>
-
-            {canUndo && (
-              <button
-                  onMouseDown={() => setIsComparing(true)}
-                  onMouseUp={() => setIsComparing(false)}
-                  onMouseLeave={() => setIsComparing(false)}
-                  onTouchStart={() => setIsComparing(true)}
-                  onTouchEnd={() => setIsComparing(false)}
-                  title="Compare with original (Hold C)"
-                  className="flex items-center justify-center text-center bg-transparent border border-gray-300 text-gray-700 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 active:scale-95 text-base"
-                  aria-label="Press and hold to see original image"
-              >
-                  <EyeIcon className="w-5 h-5 mr-2" />
-                  Compare
-              </button>
+            {image.status === 'done' && image.editedUrl && (
+                <>
+                    <img 
+                        src={image.editedUrl}
+                        alt={`Edited ${image.original.name}`}
+                        className="absolute inset-0 w-full h-full object-cover opacity-100 group-hover:opacity-0 transition-opacity"
+                    />
+                    <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-4 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                            onClick={onDownload}
+                            className="px-4 py-2 bg-blue-600 rounded-lg font-semibold hover:bg-blue-500"
+                        >
+                            Download
+                        </button>
+                    </div>
+                </>
             )}
-
-            <button
-                onClick={handleReset}
-                disabled={!canUndo}
-                title="Reset to original image (Alt + R)"
-                className="text-center bg-transparent border border-gray-300 text-gray-700 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-transparent"
-              >
-                Reset
-            </button>
-            <button
-                onClick={handleUploadNew}
-                title="Upload a new image (Alt + U)"
-                className="text-center bg-transparent border border-gray-300 text-gray-700 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 active:scale-95 text-base"
-            >
-                Upload New
-            </button>
-
-            <button
-                onClick={handleDownload}
-                title="Download image (Cmd/Ctrl + S)"
-                className="flex-grow sm:flex-grow-0 ml-auto bg-gradient-to-br from-green-600 to-green-500 text-white font-bold py-3 px-5 rounded-md transition-all duration-300 ease-in-out shadow-lg shadow-green-500/20 hover:shadow-xl hover:shadow-green-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner text-base"
-            >
-                Download Image
-            </button>
+            {image.status === 'error' && (
+                <div className="absolute inset-0 bg-red-900/80 p-2 flex flex-col items-center justify-center text-center gap-2 text-white">
+                    <p className="text-sm font-bold">Failed</p>
+                    <p className="text-xs line-clamp-3" title={image.error}>{image.error}</p>
+                    <button 
+                        onClick={onRetry}
+                        className="mt-2 px-3 py-1 bg-gray-200 text-gray-800 rounded-md text-sm font-semibold hover:bg-gray-300"
+                    >
+                        Retry
+                    </button>
+                </div>
+            )}
         </div>
-      </div>
     );
   };
-  
+
   const renderBatchEditor = () => {
-    const editableTabs: Tab[] = ['adjust', 'filters'];
-    const processedCount = batchImages.filter(img => img.status === 'done' || img.status === 'error').length;
-    const totalCount = batchImages.length;
-    const canDownload = batchImages.some(img => img.status === 'done');
-    const progressPercentage = totalCount > 0 ? (processedCount / totalCount) * 100 : 0;
-    const isBatchFinished = !isLoading && processedCount > 0;
-    const allProcessed = processedCount === totalCount;
+    const imagesDone = batchImages.filter(img => img.status === 'done').length;
+    const imagesErrored = batchImages.filter(img => img.status === 'error').length;
+    const imagesProcessing = batchImages.filter(img => img.status === 'processing').length;
 
-    let progressText = '';
-    if (isLoading) {
-        progressText = `Processing... (${processedCount} / ${totalCount} complete)`;
-    } else if (isBatchFinished) {
-        if (allProcessed) {
-            progressText = `Batch complete. (${processedCount} / ${totalCount} processed)`;
-        } else {
-            progressText = `Operation stopped. (${processedCount} / ${totalCount} processed)`;
+    const getPanelForTab = () => {
+        switch (activeTab) {
+            case 'adjust':
+                return (
+                    <AdjustmentPanel 
+                        onApplyAdjustment={(p) => handleBatchApply(p, 'adjust')} 
+                        isLoading={isLoading} 
+                        activePrompt={adjustmentPrompt}
+                        onPromptChange={setAdjustmentPrompt}
+                        isMasking={false} // Masking disabled in batch
+                        onToggleMasking={() => {}}
+                        brushSize={0}
+                        onBrushSizeChange={() => {}}
+                        onClearMask={() => {}}
+                        promptHistory={adjustHistory}
+                        onClearHistory={clearAdjustHistory}
+                    />
+                );
+            case 'filters':
+                return (
+                    <FilterPanel 
+                        onApplyFilter={(p) => handleBatchApply(p, 'filter')} 
+                        isLoading={isLoading} 
+                        activePrompt={filterPrompt}
+                        onPromptChange={setFilterPrompt}
+                        isMasking={false} // Masking disabled in batch
+                        onToggleMasking={() => {}}
+                        brushSize={0}
+                        onBrushSizeChange={() => {}}
+                        onClearMask={() => {}}
+                        promptHistory={filterHistory}
+                        onClearHistory={clearFilterHistory}
+                    />
+                );
+            default:
+                return (
+                    <div className="w-full text-center p-4 bg-gray-100 border border-gray-300 rounded-lg">
+                        <p className="text-gray-600">Please switch to the 'Adjust' or 'Filters' tab to apply a batch edit.</p>
+                    </div>
+                );
         }
-    } else {
-        progressText = `Ready to process ${totalCount} images.`;
-    }
-  
+    };
+    
     return (
-      <div className="w-full max-w-7xl mx-auto flex flex-col items-center gap-6 animate-fade-in">
-          <div className="text-center w-full max-w-4xl">
-              <h2 className="text-3xl font-bold">Batch Editing Mode</h2>
-              
-              <div className="mt-4">
-                  <p className="text-gray-600 mb-2 font-semibold">
-                      {progressText}
-                  </p>
-                  {(isLoading || isBatchFinished) && (
-                      <div className="w-full bg-gray-300 rounded-full h-4 overflow-hidden shadow-inner">
-                          <div 
-                              className={`h-4 rounded-full transition-all duration-500 ease-out ${
-                                  isLoading 
-                                      ? 'bg-gradient-to-r from-blue-500 to-cyan-400' 
-                                      : 'bg-gradient-to-r from-green-500 to-teal-400'
-                              }`}
-                              style={{ width: `${progressPercentage}%` }}
-                              role="progressbar"
-                              aria-valuenow={processedCount}
-                              aria-valuemin={0}
-                              aria-valuemax={totalCount}
-                              aria-label="Batch processing progress"
-                          ></div>
-                      </div>
-                  )}
-              </div>
-          </div>
-          
-          <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4 bg-gray-200/50 rounded-lg">
-              {batchImages.map(image => (
-                  <BatchImageCard key={image.id} image={image} onDownload={handleDownloadIndividual} onRetry={handleRetryImage} />
-              ))}
-          </div>
-  
-          <div className="w-full max-w-4xl bg-gray-200/80 border border-gray-300/80 rounded-lg p-2 flex items-center justify-center gap-2">
-              {editableTabs.map((tab) => (
-                   <button
-                      key={tab}
-                      onClick={() => handleTabChange(tab)}
-                      title={`Switch to ${tab}`}
-                      className={`w-full capitalize font-semibold py-3 px-5 rounded-md transition-all duration-200 text-base ${
-                          activeTab === tab 
-                          ? 'bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-lg shadow-cyan-500/40' 
-                          : 'text-gray-600 hover:bg-gray-300/50 hover:text-gray-900'
-                      }`}
-                  >
-                      {tab}
-                  </button>
-              ))}
-          </div>
-  
-          <div className="w-full max-w-4xl">
-              {activeTab === 'adjust' && <AdjustmentPanel onApplyAdjustment={handleApplyAdjustment} isLoading={isLoading} activePrompt={adjustmentPrompt} onPromptChange={setAdjustmentPrompt} isMasking={false} onToggleMasking={()=>{}} brushSize={0} onBrushSizeChange={()=>{}} onClearMask={()=>{}} promptHistory={adjustHistory} onClearHistory={clearAdjustHistory} />}
-              {activeTab === 'filters' && <FilterPanel onApplyFilter={handleApplyFilter} isLoading={isLoading} activePrompt={filterPrompt} onPromptChange={setFilterPrompt} isMasking={false} onToggleMasking={()=>{}} brushSize={0} onBrushSizeChange={()=>{}} onClearMask={()=>{}} promptHistory={filterHistory} onClearHistory={clearFilterHistory}/>}
-          </div>
-          
-          <div className="flex flex-wrap items-center justify-center gap-3 mt-6">
-              <button 
-                  onClick={handleDownloadBatch} 
-                  disabled={!canDownload || isLoading}
-                  className="bg-gradient-to-br from-green-600 to-green-500 text-white font-bold py-3 px-5 rounded-md transition-all duration-300 ease-in-out shadow-lg shadow-green-500/20 hover:shadow-xl hover:shadow-green-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner text-base disabled:from-green-800 disabled:to-green-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
-              >
-                  Download All (.zip)
-              </button>
-              {isLoading && (
+        <div className="w-full max-w-7xl mx-auto flex flex-col items-center gap-6 animate-fade-in">
+            <div className="w-full flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg shadow-md">
+                <div className="text-center md:text-left">
+                    <h2 className="text-2xl font-bold text-gray-800">Batch Editor ({batchImages.length} images)</h2>
+                    <p className="text-gray-600">
+                        {imagesDone} completed, {imagesErrored} failed, {imagesProcessing} processing.
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={handleUploadNew}
+                        title="Start over with new images"
+                        className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-200 rounded-full hover:bg-gray-300"
+                    >
+                        Upload New
+                    </button>
+                    {isLoading && (
+                        <button
+                            onClick={handleCancelBatch}
+                            className="px-4 py-2 text-sm font-semibold text-red-600 bg-red-100 rounded-full hover:bg-red-200"
+                        >
+                            Cancel
+                        </button>
+                    )}
+                    <button
+                        onClick={handleDownloadBatch}
+                        disabled={isLoading || imagesDone === 0}
+                        title={imagesDone > 0 ? "Download all edited images as a zip" : "No images have been successfully edited yet"}
+                        className="px-4 py-2 flex items-center gap-2 font-semibold text-white bg-blue-600 rounded-full hover:bg-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed"
+                    >
+                        <DownloadIcon className="w-5 h-5" />
+                        Download All
+                    </button>
+                </div>
+            </div>
+            
+            {/* TABS (limited for batch) */}
+            <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-full">
+              {(['adjust', 'filters'] as const).map(tab => (
                   <button
-                      onClick={handleCancelBatch}
-                      className="text-center bg-transparent border border-red-500 text-red-500 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-red-500 hover:text-white active:scale-95 text-base"
+                    key={tab}
+                    onClick={() => handleTabChange(tab)}
+                    className={`px-5 py-2 text-sm sm:text-base font-semibold rounded-full capitalize transition-all duration-300 ${activeTab === tab ? 'bg-white text-gray-800 shadow' : 'text-gray-500 hover:bg-gray-300/50'}`}
                   >
-                      Cancel Operation
+                    {tab}
                   </button>
-              )}
-              <button 
-                  onClick={handleUploadNew}
-                  disabled={isLoading}
-                  className="text-center bg-transparent border border-gray-300 text-gray-700 font-semibold py-3 px-5 rounded-md transition-all duration-200 ease-in-out hover:bg-gray-300/50 active:scale-95 text-base disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                  Exit Batch Mode
-              </button>
-          </div>
-      </div>
+              ))}
+            </div>
+
+            {getPanelForTab()}
+            
+            {error && (
+                <div 
+                    className="w-full max-w-2xl bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg animate-fade-in"
+                    role="alert"
+                >
+                    <strong className="font-bold">Error: </strong>
+                    <span className="block sm:inline">{error}</span>
+                    <button 
+                        onClick={() => setError(null)}
+                        className="absolute top-0 bottom-0 right-0 px-4 py-3"
+                        aria-label="Close error message"
+                    >
+                        <span className="text-2xl text-red-500">&times;</span>
+                    </button>
+                </div>
+            )}
+            
+            <div className="w-full grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {batchImages.map(img => (
+                    <BatchImageCard 
+                        key={img.id}
+                        image={img}
+                        onDownload={() => handleDownloadIndividual(img.editedUrl!, img.original.name)}
+                        onRetry={() => handleRetryImage(img)}
+                    />
+                ))}
+            </div>
+        </div>
     );
   };
-
-  const renderEditorContent = () => {
-    if (error) {
-       return (
-           <div className="text-center animate-fade-in bg-red-500/10 border border-red-500/20 p-8 rounded-lg max-w-2xl mx-auto flex flex-col items-center gap-4">
-            <h2 className="text-2xl font-bold text-red-500">An Error Occurred</h2>
-            <p className="text-md text-red-600">{error}</p>
-            <button
-                onClick={() => setError(null)}
-                className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded-lg text-md transition-colors"
-              >
-                Try Again
-            </button>
-          </div>
-        );
-    }
-
-    if (batchImages.length > 0) {
-        return renderBatchEditor();
-    }
-    
-    if (!currentImageUrl) {
-      return <StartScreen onFileSelect={handleFileSelect} />;
-    }
-
-    return renderSingleImageEditor();
-  };
   
+  const renderPage = () => {
+    switch (currentPage) {
+        case 'faq':
+            return <FaqPage onBackToEditor={() => setCurrentPage('editor')} />;
+        case 'inspiration':
+            return <InspirationPage onBackToEditor={() => setCurrentPage('editor')} onTryPrompt={handleTryPrompt} />;
+        case 'editor':
+        default:
+            const isEditing = currentImage || batchImages.length > 0;
+            return isEditing 
+                ? (batchImages.length > 0 ? renderBatchEditor() : renderSingleImageEditor())
+                : <StartScreen onFileSelect={handleFileSelect} />;
+    }
+  };
+
   return (
-    <div className="min-h-screen text-gray-800 flex flex-col">
+    <div className="bg-gray-50 min-h-screen">
       <Header 
         onShowShortcuts={() => setIsShortcutsModalOpen(true)}
         onShowFaq={() => setCurrentPage('faq')}
         onShowInspiration={() => setCurrentPage('inspiration')}
       />
-      <main className={`flex-grow w-full max-w-[1600px] mx-auto p-4 md:p-8 flex justify-center ${
-        (currentPage === 'editor' && (currentImage || batchImages.length > 0)) ? 'items-start' : 'items-center'
-      }`}>
-        {currentPage === 'inspiration' ? (
-          <InspirationPage onTryPrompt={handleTryPrompt} onBackToEditor={() => setCurrentPage('editor')} />
-        ) : currentPage === 'faq' ? (
-          <FaqPage onBackToEditor={() => setCurrentPage('editor')} />
-        ) : (
-          renderEditorContent()
-        )}
+      <main className="p-4 sm:p-8">
+        {renderPage()}
       </main>
       <ShortcutsModal 
         isOpen={isShortcutsModalOpen}
@@ -1258,86 +1339,5 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-interface BatchImageCardProps {
-    image: BatchImage;
-    onDownload: (editedUrl: string, originalName: string) => void;
-    onRetry: (image: BatchImage) => void;
-}
-
-const BatchImageCard: React.FC<BatchImageCardProps> = ({ image, onDownload, onRetry }) => {
-    const [originalUrl, setOriginalUrl] = useState('');
-    const [isHovering, setIsHovering] = useState(false);
-
-    useEffect(() => {
-        const url = URL.createObjectURL(image.original);
-        setOriginalUrl(url);
-        return () => URL.revokeObjectURL(url);
-    }, [image.original]);
-
-    const canToggle = image.status === 'done' && image.editedUrl;
-    const canDownload = image.status === 'done' && image.editedUrl;
-    const indicatorText = isHovering ? 'Original' : 'Edited';
-
-    return (
-        <div 
-            className="relative aspect-square bg-gray-100 rounded-md overflow-hidden group shadow-md"
-            onMouseEnter={() => canToggle && setIsHovering(true)}
-            onMouseLeave={() => canToggle && setIsHovering(false)}
-        >
-            {/* Original Image (Bottom Layer) */}
-            <img src={originalUrl} alt={image.original.name} className="absolute inset-0 w-full h-full object-cover" />
-
-            {/* Edited Image (Top Layer) - visible when available, fades on hover */}
-            {canToggle && (
-                <img 
-                    src={image.editedUrl} 
-                    alt={`${image.original.name} (edited)`} 
-                    className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ease-in-out ${isHovering ? 'opacity-0' : 'opacity-100'}`} 
-                />
-            )}
-            
-            {canDownload && (
-                <button
-                    onClick={() => onDownload(image.editedUrl!, image.original.name)}
-                    title={`Download ${image.original.name}`}
-                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-3 bg-black/60 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 ease-in-out z-20 hover:bg-black/80 active:scale-95"
-                    aria-label="Download edited image"
-                >
-                    <DownloadIcon className="w-6 h-6" />
-                </button>
-            )}
-
-            <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/60 to-transparent p-2">
-                <p className="text-white text-xs font-medium truncate">{image.original.name}</p>
-            </div>
-
-            {image.status === 'processing' && (
-                <div className="absolute inset-0 bg-black/70 flex items-center justify-center animate-fade-in">
-                    <Spinner />
-                </div>
-            )}
-            {image.status === 'error' && (
-                 <div className="absolute inset-0 bg-red-900/80 flex flex-col items-center justify-center text-white p-2 text-center animate-fade-in">
-                    <p className="font-bold text-sm">Error</p>
-                    <p className="text-xs mt-1 leading-tight">{image.error?.substring(0, 60)}...</p>
-                    <button
-                        onClick={() => onRetry(image)}
-                        className="mt-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 text-white font-semibold rounded-full text-xs transition-colors"
-                        aria-label={`Retry processing for ${image.original.name}`}
-                    >
-                        Retry
-                    </button>
-                 </div>
-            )}
-            
-            {canToggle && (
-                 <div className="absolute top-1 right-1 px-2 py-0.5 text-xs font-bold rounded-full bg-black/50 text-white transition-opacity duration-200 group-hover:opacity-100 opacity-0 z-10">
-                    {indicatorText}
-                 </div>
-            )}
-        </div>
-    )
-}
 
 export default App;
