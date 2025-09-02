@@ -21,6 +21,7 @@ import JSZip from 'jszip';
 import PromptSuggestions from './components/PromptSuggestions';
 import PromptHistoryDropdown from './components/PromptHistoryDropdown';
 import { editSuggestions } from './data/suggestions';
+import ZoomControls from './components/ZoomControls';
 
 // Helper to convert a data URL string to a File object
 const dataURLtoFile = (dataurl: string, filename: string): File => {
@@ -119,11 +120,21 @@ interface BatchImage {
   error?: string;
 }
 
+const loadingMessages = [
+    "AI is working its magic...",
+    "Analyzing pixels...",
+    "Applying creative filters...",
+    "Blending the changes seamlessly...",
+    "Finalizing the details...",
+    "Generating your masterpiece..."
+];
+
 const App: React.FC = () => {
   // Single image editor state
   const [history, setHistory] = useState<File[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
-  const [prompt, setPrompt] = useState<string>('');
+  // FIX: Renamed from prompt to avoid conflict with window.prompt
+  const [editPrompt, setEditPrompt] = useState<string>('');
   
   // Batch editor state
   const [batchImages, setBatchImages] = useState<BatchImage[]>([]);
@@ -131,6 +142,7 @@ const App: React.FC = () => {
 
   // Common state
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('edit');
   
@@ -153,6 +165,14 @@ const App: React.FC = () => {
   const maskCanvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef<boolean>(false);
   const lastPositionRef = useRef<{ x: number, y: number } | null>(null);
+
+  // Zoom and Pan state
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const isSpacePressedRef = useRef(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const viewportRef = useRef<HTMLDivElement>(null);
   
   // State lifted from panels for global shortcuts
   const [adjustmentPrompt, setAdjustmentPrompt] = useState<string>('');
@@ -174,6 +194,22 @@ const App: React.FC = () => {
 
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
+  
+  // Effect for rotating loading messages
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | undefined;
+    if (isLoading) {
+      interval = setInterval(() => {
+        setLoadingMessage(prev => {
+          const currentIndex = loadingMessages.indexOf(prev);
+          return loadingMessages[(currentIndex + 1) % loadingMessages.length];
+        });
+      }, 2500);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isLoading]);
 
   // Effect to handle trying a prompt from the inspiration gallery
   useEffect(() => {
@@ -225,6 +261,11 @@ const App: React.FC = () => {
 
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
+  
+  const resetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
 
   const addImageToHistory = useCallback((newImageFile: File) => {
     const newHistory = history.slice(0, historyIndex + 1);
@@ -236,7 +277,8 @@ const App: React.FC = () => {
     setCompletedCrop(undefined);
     setEditCrop(undefined);
     setCompletedEditCrop(undefined);
-  }, [history, historyIndex]);
+    resetView();
+  }, [history, historyIndex, resetView]);
 
   const handleImageUpload = useCallback((file: File) => {
     setError(null);
@@ -248,7 +290,8 @@ const App: React.FC = () => {
     setCompletedCrop(undefined);
     setEditCrop(undefined);
     setCompletedEditCrop(undefined);
-  }, []);
+    resetView();
+  }, [resetView]);
 
   const handleGenerate = useCallback(async () => {
     if (!currentImage) {
@@ -256,7 +299,8 @@ const App: React.FC = () => {
       return;
     }
     
-    if (!prompt.trim()) {
+    // FIX: Renamed from prompt
+    if (!editPrompt.trim()) {
         setError('Please enter a description for your edit.');
         return;
     }
@@ -270,10 +314,12 @@ const App: React.FC = () => {
     setError(null);
     
     try {
-        const editedImageUrl = await generateEditedImage(currentImage, prompt, completedEditCrop);
+        // FIX: Renamed from prompt
+        const editedImageUrl = await generateEditedImage(currentImage, editPrompt, completedEditCrop);
         const newImageFile = dataURLtoFile(editedImageUrl, `edited-${Date.now()}.png`);
         addImageToHistory(newImageFile);
-        addEditPrompt(prompt);
+        // FIX: Renamed from prompt
+        addEditPrompt(editPrompt);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
         setError(`Failed to generate the image. ${errorMessage}`);
@@ -281,7 +327,7 @@ const App: React.FC = () => {
     } finally {
         setIsLoading(false);
     }
-  }, [currentImage, prompt, completedEditCrop, addImageToHistory, addEditPrompt]);
+  }, [currentImage, editPrompt, completedEditCrop, addImageToHistory, addEditPrompt]);
   
   const handleBatchApply = useCallback(async (prompt: string, type: 'filter' | 'adjust') => {
     if (!prompt.trim()) {
@@ -444,6 +490,7 @@ const App: React.FC = () => {
         addImageToHistory(newImageFile);
         addFilterPrompt(filterPrompt);
         if (isMasking) handleClearMask();
+    // FIX: Incorrect catch syntax `() =>`
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
         setError(`Failed to apply the filter. ${errorMessage}`);
@@ -480,6 +527,7 @@ const App: React.FC = () => {
         addImageToHistory(newImageFile);
         addAdjustPrompt(adjustmentPrompt);
         if (isMasking) handleClearMask();
+    // FIX: Incorrect catch syntax `() =>`
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
         setError(`Failed to apply the adjustment. ${errorMessage}`);
@@ -538,16 +586,18 @@ const App: React.FC = () => {
       setHistoryIndex(historyIndex - 1);
       setEditCrop(undefined);
       setCompletedEditCrop(undefined);
+      resetView();
     }
-  }, [canUndo, historyIndex]);
+  }, [canUndo, historyIndex, resetView]);
   
   const handleRedo = useCallback(() => {
     if (canRedo) {
       setHistoryIndex(historyIndex + 1);
       setEditCrop(undefined);
       setCompletedEditCrop(undefined);
+      resetView();
     }
-  }, [canRedo, historyIndex]);
+  }, [canRedo, historyIndex, resetView]);
 
   const handleReset = useCallback(() => {
     if (history.length > 0) {
@@ -555,18 +605,21 @@ const App: React.FC = () => {
       setError(null);
       setEditCrop(undefined);
       setCompletedEditCrop(undefined);
+      resetView();
     }
-  }, [history]);
+  }, [history, resetView]);
 
   const handleUploadNew = useCallback(() => {
       setHistory([]);
       setHistoryIndex(-1);
       setBatchImages([]);
       setError(null);
-      setPrompt('');
+      // FIX: Renamed from setPrompt
+      setEditPrompt('');
       setEditCrop(undefined);
       setCompletedEditCrop(undefined);
-  }, []);
+      resetView();
+  }, [resetView]);
 
   const handleDownload = useCallback(() => {
       if (currentImage) {
@@ -686,14 +739,20 @@ const App: React.FC = () => {
     setCurrentPage('editor');
   }, []);
 
-    const getCoords = (e: React.MouseEvent<HTMLCanvasElement>): { x: number; y: number } | null => {
-        const canvas = maskCanvasRef.current;
-        if (!canvas) return null;
-        const rect = canvas.getBoundingClientRect();
-        return {
-            x: e.clientX - rect.left,
-            y: e.clientY - rect.top
-        };
+    const getPointOnImage = (e: React.MouseEvent<HTMLDivElement>): { x: number; y: number } | null => {
+        const viewport = viewportRef.current;
+        if (!viewport) return null;
+        
+        const rect = viewport.getBoundingClientRect();
+        // Mouse position relative to the viewport element
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Convert viewport coordinates to the coordinates on the untransformed image/canvas
+        const imageX = (mouseX - pan.x) / zoom;
+        const imageY = (mouseY - pan.y) / zoom;
+        
+        return { x: imageX, y: imageY };
     };
 
     const drawLine = (start: { x: number, y: number }, end: { x: number, y: number }) => {
@@ -704,15 +763,16 @@ const App: React.FC = () => {
         ctx.moveTo(start.x, start.y);
         ctx.lineTo(end.x, end.y);
         ctx.strokeStyle = 'white';
-        ctx.lineWidth = brushSize;
+        ctx.lineWidth = brushSize / zoom; // Scale brush size with zoom
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.stroke();
     };
 
-    const handleMaskMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const handleMaskMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (isPanning || !isMasking || e.button !== 0) return;
         isDrawingRef.current = true;
-        const coords = getCoords(e);
+        const coords = getPointOnImage(e);
         if (coords) {
             lastPositionRef.current = coords;
             // Draw a dot for single clicks
@@ -720,9 +780,9 @@ const App: React.FC = () => {
         }
     };
 
-    const handleMaskMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-        if (!isDrawingRef.current) return;
-        const coords = getCoords(e);
+    const handleMaskMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (isPanning || !isMasking || !isDrawingRef.current) return;
+        const coords = getPointOnImage(e);
         if (coords && lastPositionRef.current) {
             drawLine(lastPositionRef.current, coords);
             lastPositionRef.current = coords;
@@ -733,13 +793,81 @@ const App: React.FC = () => {
         isDrawingRef.current = false;
         lastPositionRef.current = null;
     };
+    
+    // --- Zoom and Pan handlers ---
+    const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        const viewport = viewportRef.current;
+        if (!viewport) return;
+
+        const rect = viewport.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const zoomFactor = 1 - e.deltaY * 0.001;
+        const nextZoom = Math.max(0.1, Math.min(zoom * zoomFactor, 5)); // Clamp zoom between 10% and 500%
+
+        // Point on image under cursor before zoom
+        const imgX = (mouseX - pan.x) / zoom;
+        const imgY = (mouseY - pan.y) / zoom;
+
+        // New pan to keep that point under cursor after zoom
+        const nextPanX = mouseX - imgX * nextZoom;
+        const nextPanY = mouseY - imgY * nextZoom;
+
+        setZoom(nextZoom);
+        setPan({ x: nextPanX, y: nextPanY });
+    };
+
+    const handlePanMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (e.button === 0 && isSpacePressedRef.current) { // Left click + Space
+            e.preventDefault();
+            setIsPanning(true);
+            panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+        }
+    };
+    
+    const handlePanMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (isPanning) {
+            e.preventDefault();
+            setPan({
+                x: e.clientX - panStartRef.current.x,
+                y: e.clientY - panStartRef.current.y
+            });
+        }
+    };
+
+    const handlePanMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (isPanning) {
+            e.preventDefault();
+            setIsPanning(false);
+        }
+    };
 
 
   // Keyboard shortcuts effect
   useEffect(() => {
+    const isTyping = (e: EventTarget | null) => e instanceof HTMLInputElement || e instanceof HTMLTextAreaElement;
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts if user is typing in an input field, except for specific combinations like Ctrl+Enter.
-      const isTyping = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+      if (isTyping(e.target)) {
+          // Allow Ctrl+Enter even when typing
+          if (!((e.metaKey || e.ctrlKey) && e.key === 'Enter')) {
+              return;
+          }
+      }
+      
+      // Pan with spacebar
+      if (e.code === 'Space') {
+          e.preventDefault();
+          isSpacePressedRef.current = true;
+          const viewport = viewportRef.current;
+          if (viewport && !isPanning) {
+              viewport.style.cursor = 'grab';
+          }
+          return; // Don't process other shortcuts when space is pressed
+      }
+      
       const isBatchMode = batchImages.length > 0;
 
       // Ctrl/Cmd + Enter for applying action
@@ -749,7 +877,8 @@ const App: React.FC = () => {
 
         switch (activeTab) {
           case 'edit':
-            if (!isBatchMode && prompt.trim() && completedEditCrop?.width) handleGenerate();
+            // FIX: Renamed from prompt
+            if (!isBatchMode && editPrompt.trim() && completedEditCrop?.width) handleGenerate();
             break;
           case 'adjust':
             if (adjustmentPrompt.trim()) handleApplyAdjustment(adjustmentPrompt);
@@ -763,9 +892,6 @@ const App: React.FC = () => {
         }
         return;
       }
-      
-      // Allow default browser behavior if typing (e.g., text selection)
-      if (isTyping) return;
 
       // Shortcuts disabled in batch mode
       if(isBatchMode) return;
@@ -795,6 +921,7 @@ const App: React.FC = () => {
               case '4': e.preventDefault(); handleTabChange('filters'); break;
               case 'r': e.preventDefault(); handleReset(); break;
               case 'u': e.preventDefault(); handleUploadNew(); break;
+              case 'v': e.preventDefault(); resetView(); break;
           }
       }
 
@@ -811,8 +938,17 @@ const App: React.FC = () => {
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      const isTyping = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
-      if (isTyping) return;
+      // Pan with spacebar
+      if (e.code === 'Space') {
+          isSpacePressedRef.current = false;
+          const viewport = viewportRef.current;
+          if (viewport && !isPanning) {
+               viewport.style.cursor = isMasking ? 'crosshair' : 'default';
+          }
+          return;
+      }
+      
+      if (isTyping(e.target)) return;
       
       const isBatchMode = batchImages.length > 0;
       if(isBatchMode) return;
@@ -830,10 +966,28 @@ const App: React.FC = () => {
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [
-    activeTab, canUndo, completedCrop, prompt, completedEditCrop, adjustmentPrompt, filterPrompt, isLoading, currentImage, batchImages,
+    activeTab, canUndo, completedCrop, editPrompt, completedEditCrop, adjustmentPrompt, filterPrompt, isLoading, currentImage, batchImages,
     handleGenerate, handleApplyAdjustment, handleApplyFilter, handleApplyCrop, 
-    handleUndo, handleRedo, handleReset, handleUploadNew, handleDownload, handleTabChange
+    handleUndo, handleRedo, handleReset, handleUploadNew, handleDownload, handleTabChange,
+    isMasking, isPanning, resetView
   ]);
+
+  // Effect to manage cursor style
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    if (isPanning) {
+        viewport.style.cursor = 'grabbing';
+    } else if (isSpacePressedRef.current) {
+        viewport.style.cursor = 'grab';
+    } else if (isMasking && (activeTab === 'adjust' || activeTab === 'filters')) {
+        viewport.style.cursor = 'crosshair';
+    } else {
+        viewport.style.cursor = 'default';
+    }
+  }, [isPanning, isMasking, activeTab]);
+
 
   const renderSingleImageEditor = () => {
     // A reusable component for the current image element, used by the editor and comparison view.
@@ -843,7 +997,8 @@ const App: React.FC = () => {
             key={currentImageUrl}
             src={currentImageUrl!}
             alt="Current"
-            className="w-full h-auto object-contain max-h-[60vh] rounded-xl"
+            className="block max-w-full max-h-full rounded-xl"
+            style={{ imageRendering: zoom > 1 ? 'pixelated' : 'auto' }}
             onLoad={(e) => {
                 if (isMasking && maskCanvasRef.current) {
                     const img = e.currentTarget;
@@ -863,7 +1018,6 @@ const App: React.FC = () => {
                 onChange={c => setCrop(c)}
                 onComplete={c => setCompletedCrop(c)}
                 aspect={aspect}
-                className="max-h-[60vh]"
                 disabled={isComparing}
               >
                 {currentImageElement}
@@ -876,7 +1030,6 @@ const App: React.FC = () => {
                 crop={editCrop}
                 onChange={c => setEditCrop(c)}
                 onComplete={c => setCompletedEditCrop(c)}
-                className="max-h-[60vh]"
                 disabled={isComparing}
               >
                   {currentImageElement}
@@ -888,66 +1041,88 @@ const App: React.FC = () => {
     })();
 
     return (
-      <div className="w-full max-w-4xl mx-auto flex flex-col items-center gap-6 animate-fade-in">
-        <div className="relative w-full shadow-2xl rounded-xl overflow-hidden bg-gray-200">
+      <div className="w-full max-w-7xl mx-auto flex flex-col items-center gap-6 animate-fade-in">
+        <div 
+            ref={viewportRef}
+            className="relative w-full shadow-2xl rounded-xl overflow-hidden bg-gray-200 dark:bg-black flex items-center justify-center"
+            style={{ height: '65vh' }}
+            onWheel={handleWheel}
+            onMouseDown={(e) => {
+                handlePanMouseDown(e);
+                handleMaskMouseDown(e);
+            }}
+            onMouseMove={(e) => {
+                handlePanMouseMove(e);
+                handleMaskMouseMove(e);
+            }}
+            onMouseUp={(e) => {
+                handlePanMouseUp(e);
+                handleMaskMouseUp();
+            }}
+            onMouseLeave={(e) => {
+                handlePanMouseUp(e);
+                handleMaskMouseUp();
+            }}
+        >
             {isLoading && (
-                <div className="absolute inset-0 bg-black/70 z-40 flex flex-col items-center justify-center gap-4 animate-fade-in">
+                <div className="absolute inset-0 bg-black/70 z-50 flex flex-col items-center justify-center gap-4 animate-fade-in">
                     <Spinner />
-                    <p className="text-gray-300">AI is working its magic...</p>
+                    <p className="text-gray-300">{loadingMessage}</p>
                 </div>
             )}
 
-            <div className="relative">
-                {/* Before/After Labels */}
-                <div className={`absolute top-3 left-3 px-3 py-1 text-sm font-bold rounded-full bg-black/60 text-white transition-opacity duration-300 z-30 ${isComparing ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                    Before
-                </div>
-                {canUndo && (
-                    <div className={`absolute top-3 left-3 px-3 py-1 text-sm font-bold rounded-full bg-black/60 text-white transition-opacity duration-300 z-30 ${!isComparing ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                        After
-                    </div>
-                )}
-                
-                {/*
-                  This container provides the comparison functionality.
-                  The original image is the base layer, and the editor content is the top layer.
-                  When `isComparing` is true, the top layer fades out to reveal the original.
-                */}
-                <div className="relative">
+            {/* TRANSFORM CONTAINER */}
+            <div
+                style={{
+                    transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
+                    transformOrigin: 'top left',
+                    pointerEvents: isComparing ? 'none' : 'auto',
+                }}
+            >
+                <div className="relative max-h-[65vh] flex items-center justify-center">
+                    {/* Before/After comparison layers */}
                     {originalImageUrl && (
                         <img
                             key={originalImageUrl}
                             src={originalImageUrl}
                             alt="Original"
-                            className="w-full h-auto object-contain max-h-[60vh] rounded-xl pointer-events-none"
+                            className="block max-w-full max-h-full rounded-xl"
                         />
                     )}
                     <div className={`absolute top-0 left-0 w-full h-full transition-opacity duration-200 ease-in-out ${isComparing ? 'opacity-0' : 'opacity-100'}`}>
                         {editorContent}
                     </div>
-                </div>
 
-                {/* MASKING CANVAS - overlays the comparison view */}
-                {isMasking && (activeTab === 'adjust' || activeTab === 'filters') && (
-                    <canvas
-                        ref={maskCanvasRef}
-                        className="absolute top-0 left-0 w-full h-full cursor-crosshair z-20 pointer-events-auto"
-                        style={{
-                            backgroundColor: 'rgba(230, 0, 0, 0.1)',
-                            pointerEvents: isComparing ? 'none' : 'auto',
-                        }}
-                        onMouseDown={handleMaskMouseDown}
-                        onMouseMove={handleMaskMouseMove}
-                        onMouseUp={handleMaskMouseUp}
-                        onMouseLeave={handleMaskMouseUp} // Stop drawing if mouse leaves canvas
-                    />
-                )}
+                    {/* MASKING CANVAS - overlays the comparison view */}
+                    {isMasking && (activeTab === 'adjust' || activeTab === 'filters') && (
+                        <canvas
+                            ref={maskCanvasRef}
+                            className="absolute top-0 left-0 w-full h-full z-20 pointer-events-none"
+                            style={{ backgroundColor: 'rgba(230, 0, 0, 0.1)' }}
+                        />
+                    )}
+                </div>
             </div>
 
-            {/* ERROR MESSAGE */}
+            {/* OVERLAYS (Outside transform) */}
+            <div className={`absolute top-3 left-3 px-3 py-1 text-sm font-bold rounded-full bg-black/60 text-white transition-opacity duration-300 z-30 ${isComparing ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                Before
+            </div>
+            {canUndo && (
+                <div className={`absolute top-3 left-3 px-3 py-1 text-sm font-bold rounded-full bg-black/60 text-white transition-opacity duration-300 z-30 ${!isComparing ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                    After
+                </div>
+            )}
+            <ZoomControls
+              zoom={zoom}
+              onZoomIn={() => setZoom(z => Math.min(z + 0.25, 5))}
+              onZoomOut={() => setZoom(z => Math.max(z - 0.25, 0.1))}
+              onReset={resetView}
+            />
+
             {error && (
               <div 
-                className="absolute bottom-4 left-1/2 -translate-x-1/2 w-11/12 max-w-2xl bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg z-50 animate-fade-in"
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 w-11/12 max-w-2xl bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-500/50 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg shadow-lg z-50 animate-fade-in"
                 role="alert"
               >
                 <strong className="font-bold">Error: </strong>
@@ -957,7 +1132,7 @@ const App: React.FC = () => {
                   className="absolute top-0 bottom-0 right-0 px-4 py-3"
                   aria-label="Close error message"
                 >
-                  <span className="text-2xl text-red-500">&times;</span>
+                  <span className="text-2xl text-red-500 dark:text-red-300">&times;</span>
                 </button>
               </div>
             )}
@@ -971,7 +1146,7 @@ const App: React.FC = () => {
                     onClick={handleUndo} 
                     disabled={!canUndo || isLoading} 
                     title="Undo (Cmd/Ctrl + Z)"
-                    className="p-3 bg-gray-200 text-gray-700 rounded-full transition-colors hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <UndoIcon className="w-5 h-5" />
                 </button>
@@ -979,7 +1154,7 @@ const App: React.FC = () => {
                     onClick={handleRedo} 
                     disabled={!canRedo || isLoading} 
                     title="Redo (Cmd/Ctrl + Shift + Z)"
-                    className="p-3 bg-gray-200 text-gray-700 rounded-full transition-colors hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     <RedoIcon className="w-5 h-5" />
                 </button>
@@ -987,18 +1162,18 @@ const App: React.FC = () => {
                     onClick={handleReset} 
                     disabled={!canUndo || isLoading}
                     title="Reset all changes (Alt + R)"
-                    className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-200 rounded-full hover:bg-gray-300 disabled:opacity-50"
+                    className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                     Reset
                 </button>
             </div>
             {/* Center: Tabs */}
-            <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-full">
+            <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-800 p-1 rounded-full">
               {(['edit', 'crop', 'adjust', 'filters'] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => handleTabChange(tab)}
-                    className={`px-5 py-2 text-sm sm:text-base font-semibold rounded-full capitalize transition-all duration-300 ${activeTab === tab ? 'bg-white text-gray-800 shadow' : 'text-gray-500 hover:bg-gray-300/50'}`}
+                    className={`px-5 py-2 text-sm sm:text-base font-semibold rounded-full capitalize transition-all duration-300 ${activeTab === tab ? 'bg-white dark:bg-gray-600 text-gray-800 dark:text-gray-50 shadow' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-300/50 dark:hover:bg-gray-700/50'}`}
                   >
                     {tab}
                   </button>
@@ -1012,7 +1187,7 @@ const App: React.FC = () => {
                     onMouseLeave={() => setIsComparing(false)}
                     disabled={!canUndo || isLoading}
                     title="Hold to compare with original (Hold C)"
-                    className="px-4 py-2 flex items-center gap-2 font-semibold text-gray-600 bg-gray-200 rounded-full hover:bg-gray-300 disabled:opacity-50"
+                    className="px-4 py-2 flex items-center gap-2 font-semibold text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
                 >
                     <EyeIcon className="w-5 h-5" />
                     Compare
@@ -1027,7 +1202,7 @@ const App: React.FC = () => {
                 <button
                     onClick={handleUploadNew}
                     title="Upload new image (Alt + U)"
-                    className="px-4 py-2 text-sm font-semibold text-blue-600 bg-blue-100 rounded-full hover:bg-blue-200"
+                    className="px-4 py-2 text-sm font-semibold text-blue-600 bg-blue-100 dark:bg-blue-900/50 dark:text-blue-300 rounded-full hover:bg-blue-200 dark:hover:bg-blue-900"
                 >
                     Upload New
                 </button>
@@ -1036,25 +1211,28 @@ const App: React.FC = () => {
 
         {/* --- PANELS --- */}
         {activeTab === 'edit' && (
-          <div className="w-full bg-gray-100 border border-gray-300 rounded-lg p-4 flex flex-col items-center gap-4 animate-fade-in">
-              <h3 className="text-lg font-semibold text-gray-700">Magic Edit</h3>
-              <p className="text-sm text-gray-500 -mt-2">Select an area on the image, then describe how to change it.</p>
+          <div className="w-full bg-gray-100 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-lg p-4 flex flex-col items-center gap-4 animate-fade-in">
+              <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-200">Magic Edit</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 -mt-2">Select an area on the image, then describe how to change it.</p>
               <div className="relative w-full max-w-xl">
                   <input
                       type="text"
-                      value={prompt}
+                      // FIX: Renamed from prompt
+                      value={editPrompt}
                       onFocus={() => setIsEditHistoryVisible(true)}
                       onBlur={() => setTimeout(() => setIsEditHistoryVisible(false), 200)} // Delay to allow click on dropdown
-                      onChange={(e) => setPrompt(e.target.value)}
+                      // FIX: Renamed from setPrompt
+                      onChange={(e) => setEditPrompt(e.target.value)}
                       placeholder="e.g., 'remove the person in the background'"
-                      className="w-full bg-white border border-gray-300 text-gray-800 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition disabled:cursor-not-allowed disabled:opacity-60 text-base"
+                      className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition disabled:cursor-not-allowed disabled:opacity-60 text-base"
                       disabled={isLoading || !completedEditCrop}
                   />
                    <PromptHistoryDropdown
                     isVisible={isEditHistoryVisible}
                     history={editHistory}
                     onSelect={(p) => {
-                        setPrompt(p);
+                        // FIX: Renamed from setPrompt
+                        setEditPrompt(p);
                         setIsEditHistoryVisible(false);
                     }}
                     onClear={clearEditHistory}
@@ -1064,14 +1242,16 @@ const App: React.FC = () => {
               {completedEditCrop && (
                 <PromptSuggestions 
                     suggestions={editSuggestions}
-                    onSelect={setPrompt}
+                    // FIX: Renamed from setPrompt
+                    onSelect={setEditPrompt}
                     isLoading={isLoading}
                 />
               )}
 
               <button
                   onClick={handleGenerate}
-                  disabled={isLoading || !prompt.trim() || !completedEditCrop?.width}
+                  // FIX: Renamed from prompt
+                  disabled={isLoading || !editPrompt.trim() || !completedEditCrop?.width}
                   title="Generate edit (Cmd/Ctrl + Enter)"
                   className="w-full max-w-xs mt-2 bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-4 px-6 rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner text-base disabled:from-blue-800 disabled:to-blue-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"
               >
@@ -1131,7 +1311,7 @@ const App: React.FC = () => {
     }, [image.original]);
     
     return (
-        <div className="relative aspect-square bg-gray-200 rounded-lg overflow-hidden shadow-md group">
+        <div className="relative aspect-square bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden shadow-md group">
             <img 
                 src={previewUrl ?? undefined} 
                 alt={image.original.name} 
@@ -1217,8 +1397,8 @@ const App: React.FC = () => {
                 );
             default:
                 return (
-                    <div className="w-full text-center p-4 bg-gray-100 border border-gray-300 rounded-lg">
-                        <p className="text-gray-600">Please switch to the 'Adjust' or 'Filters' tab to apply a batch edit.</p>
+                    <div className="w-full text-center p-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg">
+                        <p className="text-gray-600 dark:text-gray-400">Please switch to the 'Adjust' or 'Filters' tab to apply a batch edit.</p>
                     </div>
                 );
         }
@@ -1226,10 +1406,10 @@ const App: React.FC = () => {
     
     return (
         <div className="w-full max-w-7xl mx-auto flex flex-col items-center gap-6 animate-fade-in">
-            <div className="w-full flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-lg shadow-md">
+            <div className="w-full flex flex-col md:flex-row items-center justify-between gap-4 p-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border border-gray-200 dark:border-gray-800 rounded-lg shadow-md">
                 <div className="text-center md:text-left">
-                    <h2 className="text-2xl font-bold text-gray-800">Batch Editor ({batchImages.length} images)</h2>
-                    <p className="text-gray-600">
+                    <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Batch Editor ({batchImages.length} images)</h2>
+                    <p className="text-gray-600 dark:text-gray-400">
                         {imagesDone} completed, {imagesErrored} failed, {imagesProcessing} processing.
                     </p>
                 </div>
@@ -1237,14 +1417,14 @@ const App: React.FC = () => {
                     <button
                         onClick={handleUploadNew}
                         title="Start over with new images"
-                        className="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-200 rounded-full hover:bg-gray-300"
+                        className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-full hover:bg-gray-300 dark:hover:bg-gray-600"
                     >
                         Upload New
                     </button>
                     {isLoading && (
                         <button
                             onClick={handleCancelBatch}
-                            className="px-4 py-2 text-sm font-semibold text-red-600 bg-red-100 rounded-full hover:bg-red-200"
+                            className="px-4 py-2 text-sm font-semibold text-red-600 bg-red-100 rounded-full hover:bg-red-200 dark:bg-red-900/50 dark:text-red-300 dark:hover:bg-red-900"
                         >
                             Cancel
                         </button>
@@ -1262,12 +1442,12 @@ const App: React.FC = () => {
             </div>
             
             {/* TABS (limited for batch) */}
-            <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-full">
+            <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-800 p-1 rounded-full">
               {(['adjust', 'filters'] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => handleTabChange(tab)}
-                    className={`px-5 py-2 text-sm sm:text-base font-semibold rounded-full capitalize transition-all duration-300 ${activeTab === tab ? 'bg-white text-gray-800 shadow' : 'text-gray-500 hover:bg-gray-300/50'}`}
+                    className={`px-5 py-2 text-sm sm:text-base font-semibold rounded-full capitalize transition-all duration-300 ${activeTab === tab ? 'bg-white dark:bg-gray-600 text-gray-800 dark:text-gray-50 shadow' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-300/50 dark:hover:bg-gray-700/50'}`}
                   >
                     {tab}
                   </button>
@@ -1278,7 +1458,7 @@ const App: React.FC = () => {
             
             {error && (
                 <div 
-                    className="w-full max-w-2xl bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg animate-fade-in"
+                    className="w-full max-w-2xl bg-red-100 dark:bg-red-900/50 border border-red-400 dark:border-red-500/50 text-red-700 dark:text-red-200 px-4 py-3 rounded-lg shadow-lg animate-fade-in"
                     role="alert"
                 >
                     <strong className="font-bold">Error: </strong>
@@ -1288,7 +1468,7 @@ const App: React.FC = () => {
                         className="absolute top-0 bottom-0 right-0 px-4 py-3"
                         aria-label="Close error message"
                     >
-                        <span className="text-2xl text-red-500">&times;</span>
+                        <span className="text-2xl text-red-500 dark:text-red-300">&times;</span>
                     </button>
                 </div>
             )}
@@ -1323,13 +1503,13 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="bg-gray-50 min-h-screen">
+    <div className="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-50 min-h-screen flex flex-col">
       <Header 
         onShowShortcuts={() => setIsShortcutsModalOpen(true)}
         onShowFaq={() => setCurrentPage('faq')}
         onShowInspiration={() => setCurrentPage('inspiration')}
       />
-      <main className="p-4 sm:p-8">
+      <main className="p-4 sm:p-8 flex-grow flex flex-col">
         {renderPage()}
       </main>
       <ShortcutsModal 

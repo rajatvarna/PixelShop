@@ -20,7 +20,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onFileSelect }) => {
 
   return (
     <div 
-      className={`w-full max-w-7xl mx-auto text-center p-4 sm:p-8 transition-all duration-300 rounded-2xl border-2 ${isDraggingOver ? 'bg-blue-500/10 border-dashed border-blue-400 scale-[1.01]' : 'border-transparent'}`}
+      className={`w-full max-w-7xl mx-auto text-center p-4 sm:p-8 transition-all duration-300 rounded-2xl border-2 ${isDraggingOver ? 'bg-blue-500/10 dark:bg-blue-500/20 border-dashed border-blue-400 scale-[1.01]' : 'border-transparent'}`}
       onDragOver={(e) => { e.preventDefault(); setIsDraggingOver(true); }}
       onDragLeave={() => setIsDraggingOver(false)}
       onDrop={(e) => {
@@ -32,10 +32,10 @@ const StartScreen: React.FC<StartScreenProps> = ({ onFileSelect }) => {
       <div className="animate-fade-in">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div className="flex flex-col items-center md:items-start text-center md:text-left gap-6">
-            <h1 className="text-5xl font-extrabold tracking-tight text-gray-800 sm:text-6xl md:text-7xl">
+            <h1 className="text-5xl font-extrabold tracking-tight text-gray-800 dark:text-gray-100 sm:text-6xl md:text-7xl">
               AI-Powered Photo Editing, <span className="text-blue-500">Simplified</span>.
             </h1>
-            <p className="max-w-2xl text-lg text-gray-600 md:text-xl">
+            <p className="max-w-2xl text-lg text-gray-600 dark:text-gray-300 md:text-xl">
               Retouch photos, apply creative filters, or make professional adjustments using simple text prompts. No complex tools needed.
             </p>
 
@@ -45,7 +45,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onFileSelect }) => {
                     Upload Image(s)
                 </label>
                 <input id="image-upload-start" type="file" className="hidden" accept="image/*" onChange={handleFileChange} multiple />
-                <p className="text-sm text-gray-500">or drag and drop a file (or files)</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">or drag and drop a file (or files)</p>
             </div>
           </div>
           <div className="hidden md:block">
@@ -54,7 +54,7 @@ const StartScreen: React.FC<StartScreenProps> = ({ onFileSelect }) => {
         </div>
 
         <div className="mt-24 w-full">
-            <h2 className="text-3xl font-bold tracking-tight text-gray-800 mb-12">
+            <h2 className="text-3xl font-bold tracking-tight text-gray-800 dark:text-gray-100 mb-12">
                 Explore the Possibilities
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -88,12 +88,12 @@ interface FeatureCardProps {
 }
 
 const FeatureCard: React.FC<FeatureCardProps> = ({ icon, title, description }) => (
-    <div className="bg-white/60 p-6 rounded-lg border border-gray-300/50 flex flex-col items-center text-center transition-all duration-300 hover:border-gray-400/80 hover:scale-[1.02] hover:bg-white">
-        <div className="flex items-center justify-center w-12 h-12 bg-gray-200 rounded-full mb-4">
+    <div className="bg-white/60 dark:bg-gray-800/30 p-6 rounded-lg border border-gray-300/50 dark:border-gray-700/50 flex flex-col items-center text-center transition-all duration-300 hover:border-gray-400/80 dark:hover:border-gray-600/80 hover:scale-[1.02] hover:bg-white dark:hover:bg-gray-800/60">
+        <div className="flex items-center justify-center w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full mb-4">
            {icon}
         </div>
-        <h3 className="text-xl font-bold text-gray-800">{title}</h3>
-        <p className="mt-2 text-gray-600">{description}</p>
+        <h3 className="text-xl font-bold text-gray-800 dark:text-gray-100">{title}</h3>
+        <p className="mt-2 text-gray-600 dark:text-gray-300">{description}</p>
     </div>
 );
 

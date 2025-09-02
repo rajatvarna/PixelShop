@@ -12,8 +12,8 @@ interface FaqPageProps {
 
 const FaqItem: React.FC<{ question: string; children: React.ReactNode }> = ({ question, children }) => (
     <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">{question}</h3>
-        <div className="text-gray-600 space-y-2">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-2">{question}</h3>
+        <div className="text-gray-600 dark:text-gray-300 space-y-2">
             {children}
         </div>
     </div>
@@ -30,12 +30,12 @@ const FaqPage: React.FC<FaqPageProps> = ({ onBackToEditor }) => {
             <ChevronLeftIcon className="w-5 h-5" />
             Back to Editor
         </button>
-        <h1 className="text-4xl font-extrabold tracking-tight text-gray-800">
+        <h1 className="text-4xl font-extrabold tracking-tight text-gray-800 dark:text-gray-50">
             Frequently Asked Questions
         </h1>
 
-        <div className="w-full bg-white border border-gray-200 rounded-lg p-6 md:p-8 mt-4">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6 border-b border-gray-200 pb-4">
+        <div className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg p-6 md:p-8 mt-4">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6 border-b border-gray-200 dark:border-gray-700 pb-4">
                 General Questions
             </h2>
             <FaqItem question="How does the AI editing work?">

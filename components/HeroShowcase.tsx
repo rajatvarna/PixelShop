@@ -4,24 +4,10 @@
 */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { inspirationData } from '../data/inspiration';
 
-const examples = [
-  {
-    prompt: "Remove the person from the background",
-    before: "https://placehold.co/600x400/64748b/FFFFFF?text=Before",
-    after: "https://placehold.co/600x400/38bdf8/FFFFFF?text=After",
-  },
-  {
-    prompt: "Apply a vibrant 'Synthwave' filter",
-    before: "https://placehold.co/600x400/9ca3af/FFFFFF?text=Before",
-    after: "https://placehold.co/600x400/e879f9/FFFFFF?text=After",
-  },
-  {
-    prompt: "Add a professional background blur",
-    before: "https://placehold.co/600x400/a1a1aa/FFFFFF?text=Before",
-    after: "https://placehold.co/600x400/818cf8/FFFFFF?text=After",
-  },
-];
+// Select a few diverse and visually interesting examples from the main inspiration data
+const examples = inspirationData.filter(item => ['synthwave', 'studio-light', 'cartoonify'].includes(item.id));
 
 const PARALLAX_STRENGTH = 20;
 
@@ -66,7 +52,7 @@ const HeroShowcase: React.FC = () => {
             onMouseLeave={() => setIsPaused(false)}
         >
             <div 
-              className="relative w-full aspect-[4/3] rounded-2xl shadow-2xl overflow-hidden group bg-gray-200"
+              className="relative w-full aspect-[4/3] rounded-2xl shadow-2xl overflow-hidden group bg-gray-200 dark:bg-gray-800"
               onMouseEnter={() => setIsHovering(true)}
               onMouseLeave={handleMouseLeave}
               onMouseMove={handleMouseMove}
@@ -97,7 +83,7 @@ const HeroShowcase: React.FC = () => {
                 </div>
             </div>
 
-            <p className="text-gray-700 font-medium text-center h-12 flex items-center">
+            <p className="text-gray-700 dark:text-gray-300 font-medium text-center h-12 flex items-center">
                 <span className="font-mono text-blue-500 mr-2 text-lg">&gt;</span>
                 {currentExample.prompt}
             </p>
@@ -108,7 +94,7 @@ const HeroShowcase: React.FC = () => {
                         key={index}
                         onClick={() => setCurrentIndex(index)}
                         className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                            currentIndex === index ? 'bg-blue-500 scale-125' : 'bg-gray-300 hover:bg-gray-400'
+                            currentIndex === index ? 'bg-blue-500 scale-125' : 'bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
                         }`}
                         aria-label={`Go to example ${index + 1}`}
                     />

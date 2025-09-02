@@ -23,10 +23,10 @@ const InspirationPage: React.FC<InspirationPageProps> = ({ onBackToEditor, onTry
             Back to Editor
         </button>
         <div className="text-center w-full">
-            <h1 className="text-4xl font-extrabold tracking-tight text-gray-800">
+            <h1 className="text-4xl font-extrabold tracking-tight text-gray-800 dark:text-gray-100">
                 Inspiration Gallery
             </h1>
-            <p className="mt-2 text-lg text-gray-600 max-w-3xl mx-auto">
+            <p className="mt-2 text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
                 Discover creative prompts from the community. See a style you like? Try it on your own photos with one click.
             </p>
         </div>
@@ -42,9 +42,9 @@ const InspirationPage: React.FC<InspirationPageProps> = ({ onBackToEditor, onTry
 
 const InspirationCard: React.FC<{ item: Inspiration; onTryPrompt: InspirationPageProps['onTryPrompt'] }> = ({ item, onTryPrompt }) => {
     return (
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden flex flex-col group">
+        <div className="bg-white dark:bg-gray-800/50 rounded-xl shadow-lg overflow-hidden flex flex-col group border border-gray-200 dark:border-gray-700">
             <div 
-                className="relative aspect-square w-full bg-gray-200 overflow-hidden"
+                className="relative aspect-square w-full bg-gray-200 dark:bg-gray-800 overflow-hidden"
             >
                 <img 
                     src={item.before} 
@@ -70,8 +70,8 @@ const InspirationCard: React.FC<{ item: Inspiration; onTryPrompt: InspirationPag
                 </div>
             </div>
             <div className="p-4 flex flex-col flex-grow">
-                <p className="text-gray-600 text-sm flex-grow">
-                    <span className="font-bold text-gray-800">Prompt:</span> "{item.prompt}"
+                <p className="text-gray-600 dark:text-gray-300 text-sm flex-grow">
+                    <span className="font-bold text-gray-800 dark:text-gray-100">Prompt:</span> "{item.prompt}"
                 </p>
                 <button 
                     onClick={() => onTryPrompt(item.prompt, item.type)}
