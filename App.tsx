@@ -146,7 +146,6 @@ const App: React.FC = () => {
   // Single image editor state
   const [history, setHistory] = useState<File[]>([]);
   const [historyIndex, setHistoryIndex] = useState<number>(-1);
-  // FIX: Renamed from prompt to avoid conflict with window.prompt
   const [editPrompt, setEditPrompt] = useState<string>('');
   
   // Batch editor state
@@ -373,7 +372,6 @@ const App: React.FC = () => {
       return;
     }
     
-    // FIX: Renamed from prompt
     if (!editPrompt.trim()) {
         setError('Please enter a description for your edit.');
         return;
@@ -388,11 +386,9 @@ const App: React.FC = () => {
     setError(null);
     
     try {
-        // FIX: Renamed from prompt
         const editedImageUrl = await generateEditedImage(currentImage, editPrompt, completedEditCrop);
         const newImageFile = dataURLtoFile(editedImageUrl, `edited-${Date.now()}.png`);
         addImageToHistory(newImageFile);
-        // FIX: Renamed from prompt
         addEditPrompt(editPrompt);
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
@@ -564,7 +560,6 @@ const App: React.FC = () => {
         addImageToHistory(newImageFile);
         addFilterPrompt(filterPrompt);
         if (isMasking) handleClearMask();
-    // FIX: Incorrect catch syntax `() =>`
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
         setError(`Failed to apply the filter. ${errorMessage}`);
@@ -601,7 +596,6 @@ const App: React.FC = () => {
         addImageToHistory(newImageFile);
         addAdjustPrompt(adjustmentPrompt);
         if (isMasking) handleClearMask();
-    // FIX: Incorrect catch syntax `() =>`
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
         setError(`Failed to apply the adjustment. ${errorMessage}`);
@@ -744,7 +738,6 @@ const App: React.FC = () => {
       setHistoryIndex(-1);
       setBatchImages([]);
       setError(null);
-      // FIX: Renamed from setPrompt
       setEditPrompt('');
       setEditCrop(undefined);
       setCompletedEditCrop(undefined);
@@ -1008,7 +1001,6 @@ const App: React.FC = () => {
 
         switch (activeTab) {
           case 'edit':
-            // FIX: Renamed from prompt
             if (!isBatchMode && editPrompt.trim() && completedEditCrop?.width) handleGenerate();
             break;
           case 'adjust':
@@ -1349,11 +1341,9 @@ const App: React.FC = () => {
               <div className="relative w-full max-w-xl">
                   <input
                       type="text"
-                      // FIX: Renamed from prompt
                       value={editPrompt}
                       onFocus={() => setIsEditHistoryVisible(true)}
                       onBlur={() => setTimeout(() => setIsEditHistoryVisible(false), 200)} // Delay to allow click on dropdown
-                      // FIX: Renamed from setPrompt
                       onChange={(e) => setEditPrompt(e.target.value)}
                       placeholder="e.g., 'remove the person in the background'"
                       className="w-full bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-800 dark:text-gray-100 rounded-lg p-4 focus:ring-2 focus:ring-blue-500 focus:outline-none transition disabled:cursor-not-allowed disabled:opacity-60 text-base"
@@ -1363,7 +1353,6 @@ const App: React.FC = () => {
                     isVisible={isEditHistoryVisible}
                     history={editHistory}
                     onSelect={(p) => {
-                        // FIX: Renamed from setPrompt
                         setEditPrompt(p);
                         setIsEditHistoryVisible(false);
                     }}
@@ -1374,7 +1363,6 @@ const App: React.FC = () => {
               {completedEditCrop && (
                 <PromptSuggestions 
                     suggestions={editSuggestions}
-                    // FIX: Renamed from setPrompt
                     onSelect={setEditPrompt}
                     isLoading={isLoading}
                 />
@@ -1382,7 +1370,6 @@ const App: React.FC = () => {
 
               <button
                   onClick={handleGenerate}
-                  // FIX: Renamed from prompt
                   disabled={isLoading || !editPrompt.trim() || !completedEditCrop?.width}
                   title="Generate edit (Cmd/Ctrl + Enter)"
                   className="w-full max-w-xs mt-2 bg-gradient-to-br from-blue-600 to-blue-500 text-white font-bold py-4 px-6 rounded-lg transition-all duration-300 ease-in-out shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-px active:scale-95 active:shadow-inner text-base disabled:from-blue-800 disabled:to-blue-700 disabled:shadow-none disabled:cursor-not-allowed disabled:transform-none"

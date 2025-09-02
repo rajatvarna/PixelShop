@@ -123,7 +123,6 @@ export const generateFilteredImage = async (
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     
     const originalImagePart = await fileToPart(originalImage);
-    // FIX: Explicitly type `parts` to allow both image and text parts, preventing a TypeScript error.
     const parts: ({ inlineData: { mimeType: string; data: string; } } | { text: string })[] = [originalImagePart];
     let prompt: string;
 
@@ -177,7 +176,6 @@ export const generateAdjustedImage = async (
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
     
     const originalImagePart = await fileToPart(originalImage);
-    // FIX: Explicitly type `parts` to allow both image and text parts, preventing a TypeScript error.
     const parts: ({ inlineData: { mimeType: string; data: string; } } | { text: string })[] = [originalImagePart];
     let prompt: string;
 
