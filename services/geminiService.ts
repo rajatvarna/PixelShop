@@ -221,3 +221,73 @@ Output: Return ONLY the final adjusted image. Do not return text.`;
     
     return handleApiResponse(response, 'adjustment');
 };
+
+/**
+ * Expands an image canvas and uses generative AI to fill the new areas.
+ * @param originalImage The original image file.
+ * @param targetWidth The desired final width of the image.
+ * @param targetHeight The desired final height of the image.
+ * @returns A promise that resolves to the data URL of the uncropped image.
+ */
+export const generateUncroppedImage = async (
+    originalImage: File,
+    targetWidth: number,
+    targetHeight: number,
+): Promise<string> => {
+    console.log(`Starting generative uncrop to dimensions: ${targetWidth}x${targetHeight}`);
+    
+    // Step 1: Create a new canvas with transparent padding
+    const imageWithPadding = await new Promise<File>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                return reject(new Error('Could not get canvas context.'));
+            }
+
+            // Calculate position to center the original image
+            const x = (targetWidth - img.width) / 2;
+            const y = (targetHeight - img.height) / 2;
+
+            // Draw the original image onto the center of the larger canvas
+            ctx.drawImage(img, x, y);
+
+            // Export the canvas as a PNG file
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    return reject(new Error('Canvas toBlob failed.'));
+                }
+                resolve(new File([blob], 'uncrop-base.png', { type: 'image/png' }));
+            }, 'image/png');
+        };
+        img.onerror = reject;
+        img.src = URL.createObjectURL(originalImage);
+    });
+
+    // Step 2: Send to Gemini API
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+    
+    const imagePart = await fileToPart(imageWithPadding);
+    const prompt = `You are an expert in photorealistic outpainting. You have been given an image that has transparent areas around a central, existing photo. Your task is to creatively and seamlessly fill in ONLY the transparent areas.
+    
+Guidelines:
+- Extend the existing scene in a natural and believable way.
+- Perfectly match the style, lighting, color grading, and perspective of the original image content.
+- The boundary between the original image and the generated content must be invisible.
+- Do not modify any pixels of the original, non-transparent image content.
+
+Output: Return ONLY the final, fully filled-in image. Do not return text or other content.`;
+    const textPart = { text: prompt };
+
+    console.log('Sending padded image and uncrop prompt to the model...');
+    const response: GenerateContentResponse = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: { parts: [imagePart, textPart] },
+    });
+    console.log('Received response from model for uncrop.', response);
+
+    return handleApiResponse(response, 'uncrop');
+};

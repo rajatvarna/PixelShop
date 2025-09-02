@@ -6,12 +6,13 @@
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop';
-import { generateEditedImage, generateFilteredImage, generateAdjustedImage } from './services/geminiService';
+import { generateEditedImage, generateFilteredImage, generateAdjustedImage, generateUncroppedImage } from './services/geminiService';
 import Header from './components/Header';
 import Spinner from './components/Spinner';
 import FilterPanel from './components/FilterPanel';
 import AdjustmentPanel from './components/AdjustmentPanel';
 import CropPanel from './components/CropPanel';
+import UncropPanel from './components/UncropPanel';
 import { UndoIcon, RedoIcon, EyeIcon, DownloadIcon } from './components/icons';
 import StartScreen from './components/StartScreen';
 import ShortcutsModal from './components/ShortcutsModal';
@@ -39,6 +40,16 @@ const dataURLtoFile = (dataurl: string, filename: string): File => {
     }
     return new File([u8arr], filename, {type:mime});
 }
+
+// Helper to convert a File to a base64 data URL
+const fileToDataURL = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
 
 // Helper to check if a canvas is empty (all transparent)
 const isCanvasBlank = (canvas: HTMLCanvasElement): boolean => {
@@ -108,7 +119,7 @@ const usePromptHistory = (storageKey: string) => {
 };
 
 
-type Tab = 'edit' | 'adjust' | 'filters' | 'crop';
+type Tab = 'edit' | 'adjust' | 'filters' | 'crop' | 'uncrop';
 type Page = 'editor' | 'faq' | 'inspiration';
 
 type BatchImageStatus = 'pending' | 'processing' | 'done' | 'error';
@@ -128,6 +139,8 @@ const loadingMessages = [
     "Finalizing the details...",
     "Generating your masterpiece..."
 ];
+
+const AUTOSAVE_KEY = 'pixelshop_autosave';
 
 const App: React.FC = () => {
   // Single image editor state
@@ -195,6 +208,67 @@ const App: React.FC = () => {
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [originalImageUrl, setOriginalImageUrl] = useState<string | null>(null);
   
+  // --- Auto-save and Restore Effects ---
+  // Effect for restoring session on load
+  useEffect(() => {
+      const restoreSession = () => {
+          try {
+              const savedStateJSON = localStorage.getItem(AUTOSAVE_KEY);
+              if (!savedStateJSON) return;
+
+              const savedState = JSON.parse(savedStateJSON);
+              const lastSaved = new Date(savedState.timestamp);
+              
+              if (window.confirm(`You have an unsaved session from ${lastSaved.toLocaleString()}. Would you like to restore it?`)) {
+                  const restoredHistory = savedState.history.map((item: { dataUrl: string, name: string }) => 
+                      dataURLtoFile(item.dataUrl, item.name)
+                  );
+                  setHistory(restoredHistory);
+                  setHistoryIndex(savedState.historyIndex);
+              } else {
+                  localStorage.removeItem(AUTOSAVE_KEY);
+              }
+          } catch (err) {
+              console.error("Failed to restore session:", err);
+              localStorage.removeItem(AUTOSAVE_KEY);
+          }
+      };
+
+      restoreSession();
+      // This effect should only run once on initial mount.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Effect for auto-saving session on change
+  useEffect(() => {
+    // Debounce saving to avoid excessive writes for rapid changes (like undo/redo spam)
+    const timeoutId = setTimeout(async () => {
+        if (history.length === 0 || historyIndex < 0) {
+            localStorage.removeItem(AUTOSAVE_KEY);
+            return;
+        }
+
+        try {
+            const serializableHistory = await Promise.all(history.map(async (file) => ({
+                name: file.name,
+                dataUrl: await fileToDataURL(file),
+            })));
+
+            const stateToSave = {
+                history: serializableHistory,
+                historyIndex,
+                timestamp: new Date().toISOString(),
+            };
+
+            localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(stateToSave));
+        } catch (err) {
+            console.error("Failed to auto-save session:", err);
+        }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [history, historyIndex]);
+
   // Effect for rotating loading messages
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
@@ -581,6 +655,62 @@ const App: React.FC = () => {
 
   }, [completedCrop, addImageToHistory]);
 
+  const handleApplyUncrop = useCallback(async (aspectRatio: number) => {
+    if (!currentImage) {
+        setError('No image loaded to uncrop.');
+        return;
+    }
+
+    const img = new Image();
+    img.onload = async () => {
+        const originalWidth = img.naturalWidth;
+        const originalHeight = img.naturalHeight;
+        const originalAspect = originalWidth / originalHeight;
+
+        let targetWidth: number, targetHeight: number;
+
+        // Determine the new dimensions while preserving one original dimension
+        if (aspectRatio > originalAspect) {
+            // New aspect is wider, so we match the height and expand the width
+            targetHeight = originalHeight;
+            targetWidth = Math.round(originalHeight * aspectRatio);
+        } else {
+            // New aspect is taller, so we match the width and expand the height
+            targetWidth = originalWidth;
+            targetHeight = Math.round(originalWidth / aspectRatio);
+        }
+        
+        // Limit max dimension to avoid overly large requests
+        const MAX_DIMENSION = 2048;
+        if (targetWidth > MAX_DIMENSION || targetHeight > MAX_DIMENSION) {
+            const scale = Math.min(MAX_DIMENSION / targetWidth, MAX_DIMENSION / targetHeight);
+            targetWidth = Math.round(targetWidth * scale);
+            targetHeight = Math.round(targetHeight * scale);
+            console.warn(`Uncrop dimensions too large, scaled down to ${targetWidth}x${targetHeight}`);
+        }
+
+        setIsLoading(true);
+        setError(null);
+        
+        try {
+            const uncroppedImageUrl = await generateUncroppedImage(currentImage, targetWidth, targetHeight);
+            const newImageFile = dataURLtoFile(uncroppedImageUrl, `uncropped-${Date.now()}.png`);
+            addImageToHistory(newImageFile);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+            setError(`Failed to uncrop the image. ${errorMessage}`);
+            console.error(err);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+    img.onerror = () => {
+        setError("Could not read image dimensions.");
+        setIsLoading(false);
+    };
+    img.src = URL.createObjectURL(currentImage);
+  }, [currentImage, addImageToHistory]);
+
   const handleUndo = useCallback(() => {
     if (canUndo) {
       setHistoryIndex(historyIndex - 1);
@@ -618,6 +748,7 @@ const App: React.FC = () => {
       setEditPrompt('');
       setEditCrop(undefined);
       setCompletedEditCrop(undefined);
+      localStorage.removeItem(AUTOSAVE_KEY);
       resetView();
   }, [resetView]);
 
@@ -919,6 +1050,7 @@ const App: React.FC = () => {
               case '2': e.preventDefault(); handleTabChange('crop'); break;
               case '3': e.preventDefault(); handleTabChange('adjust'); break;
               case '4': e.preventDefault(); handleTabChange('filters'); break;
+              case '5': e.preventDefault(); handleTabChange('uncrop'); break;
               case 'r': e.preventDefault(); handleReset(); break;
               case 'u': e.preventDefault(); handleUploadNew(); break;
               case 'v': e.preventDefault(); resetView(); break;
@@ -1036,7 +1168,7 @@ const App: React.FC = () => {
               </ReactCrop>
             );
         }
-        // For 'adjust' and 'filters', it's just the plain image
+        // For other tabs, it's just the plain image
         return currentImageElement;
     })();
 
@@ -1169,7 +1301,7 @@ const App: React.FC = () => {
             </div>
             {/* Center: Tabs */}
             <div className="flex items-center gap-1 bg-gray-200 dark:bg-gray-800 p-1 rounded-full">
-              {(['edit', 'crop', 'adjust', 'filters'] as const).map(tab => (
+              {(['edit', 'crop', 'adjust', 'filters', 'uncrop'] as const).map(tab => (
                   <button
                     key={tab}
                     onClick={() => handleTabChange(tab)}
@@ -1265,6 +1397,13 @@ const App: React.FC = () => {
             onSetAspect={setAspect}
             isLoading={isLoading}
             isCropping={!!completedCrop?.width && completedCrop.width > 0}
+          />
+        )}
+        {activeTab === 'uncrop' && (
+          <UncropPanel 
+            onApplyUncrop={handleApplyUncrop} 
+            isLoading={isLoading}
+            originalAspect={imgRef.current ? imgRef.current.naturalWidth / imgRef.current.naturalHeight : 16/9}
           />
         )}
         {activeTab === 'adjust' && (

@@ -72,6 +72,7 @@ const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
                 <Shortcut keys={['Alt', '2']} description="Switch to Crop tab" />
                 <Shortcut keys={['Alt', '3']} description="Switch to Adjust tab" />
                 <Shortcut keys={['Alt', '4']} description="Switch to Filters tab" />
+                <Shortcut keys={['Alt', '5']} description="Switch to Uncrop tab" />
             </div>
 
             <div>
